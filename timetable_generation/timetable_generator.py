@@ -1,42 +1,44 @@
 """
 Return File Structure (JSON):
-    TimeTable: {
-        student_number1 (string): {
-            day (string): {
-                period (string): room (string)
-            }
-            ...
+{
+    student_number1 (string): {
+        day (string): {
+            period (string): room (string)
         }
         ...
     }
+}
 
 Example:
-    TimeTable: {
-        "21447": {
-            "1": {
-                "1": "531",
-                "2": "531",
-                "3": "430",
-                "4": "430"
-                ...
-            },
-            "2": {...}
+{
+    "21447": {
+        "1": {
+            "1": "531",
+            "2": "531",
+            "3": "430",
+            "4": "430"
+            ...
         },
-        "21448": {
-            "1": {
-                "1": "210",
-                "2": "210",
-                "3": "322",
-                "4": "322"
-                ...
-            },
-            "2": {...}
-        }
+        "2": {...},
+        ...
+    },
+    "21448": {
+        "1": {
+            "1": "210",
+            "2": "210",
+            "3": "322",
+            "4": "322"
+            ...
+        },
+        "2": {...},
+        ...
     }
+}
 """
 
 import random
 import copy
+import json
 
 
 class TimetableGenerator:
@@ -89,6 +91,7 @@ class TimetableGenerator:
         self.glevel_set_map = [glevel_core_set_map, glevel_elect_set_map]
         # the currently filled rooms
         self.filled_rooms = [dict(zip(range(2, 9), [set() for _ in range(2, 9)])) for _ in range(9)]
+        self.time_table = {}
 
     # map rooms into different buildings
     @staticmethod
@@ -106,44 +109,43 @@ class TimetableGenerator:
             1.2 180 non-repetitive non-PE courses (1 course = 2 classes per week)
             1.3 100 non-repetitive elective courses (core courses: chinese, eng, math, chem) -> true as everyone has 5 electives
                 1.3.1 80 clean extra courses (there are one more 2-period english and enrichment class)
-            1.4 distribute 80 courses into PE, Bus, Hum, Enr, Lan, Sci following common-sense weightings (dict "elective_freq")
-                1.4.1 Extra(art/drama/pe/music): 12
-                1.4.2 Bus (econ/bus): 18
-                1.4.3 Hum (geo+his+gp): 14
-                1.4.4 Enr (cs): 6
-                1.4.5 Lan (fren/span/ja): 5
-                1.4.6 Sci (bio+phy): 25
-            1.5 distribute timeslots for each course
-                1.5.1 assign fixed scheduling
-                    - SCIE has fixed scheduling - it separates classes into different timeslot couples
-                       e.g, courses at Monday P1 would repeat at Wednesday P1
-                    - 19 2-periods in a week, 18 non-PE, 2-periods in a week, 9 schedule sets,
-                    - 8 clean schedule sets (without enrichment and another eng)
-                    - schedule sets for core and electives are separated
-                    - hence, distribute each class into these sets
-                1.5.2 define schedule sets
-                    - 4 core schedule sets (Enr, Chi, Eng, Sci)
-                        1. Mon78, Thu90
-                        2. Mon90, Wed34
-                        3. Tue12, Fri34
-                        4. Tue34, Fri78
-                    - 4 elective schedule sets (Extra, Bus, Hum, Lan)
-                        1: Mon12, Thu34
-                        2. Mon34, Tue90
-                        3. Tue78, Thu78
-                        4. Wed12, Fri12
-            1.6 distribute the rooms for each course
-                1.6.1 the rooms available for each floor is stored in the dict "avail_rooms"
-                1.6.2 limitations: courses at each scheduling set should not have the same room
-            1.7 distribute each student's list of courses taken
-                1.7.1 distribute each student to a core class
-            1.8 project back to generate the timetable
+        2: distribute 80 courses into Extra, Bus, Hum, Enr, Lan, Sci following common-sense weightings (dict "elective_freq")
+            2.1 Extra(art/drama/pe/music): 12
+            2.2 Bus (econ/bus): 18
+            2.3 Hum (geo+his+gp): 14
+            2.4 Enr (cs): 6
+            2.5 Lan (fren/span/ja): 5
+            2.6 Sci (bio+phy): 25
+        3: distribute timeslots for each course
+           3.1 assign fixed scheduling
+                - SCIE has fixed scheduling - it separates classes into different timeslot couples
+                   e.g, courses at Monday P1 would repeat at Wednesday P1
+                - 19 2-periods in a week, 18 non-PE, 2-periods in a week, 9 schedule sets,
+                - 8 clean schedule sets (without enrichment and another eng)
+                - schedule sets for core and electives are separated
+                - hence, distribute each class into these sets
+            3.2 define schedule sets
+                - 4 core schedule sets (Enr, Chi, Eng, Sci)
+                    1. Mon78, Thu90
+                    2. Mon90, Wed34
+                    3. Tue12, Fri34
+                    4. Tue34, Fri78
+                - 4 elective schedule sets (Extra, Bus, Hum, Lan)
+                    1: Mon12, Thu34
+                    2. Mon34, Tue90
+                    3. Tue78, Thu78
+                    4. Wed12, Fri12
+        4: distribute the rooms for each course
+            4.1 the rooms available for each floor is stored in the dict "avail_rooms"
+            4.2 limitations: courses at each scheduling set should not have the same room
+        5: distribute each student's list of courses taken
+        6: project back to generate the timetable
 
         :param: grade: either G1 or G2
-        :return: timetable for the class
+        :return: timetable as a JSON
         """
         # Procedures #
-        # 1.5 distribute timeslots for each course, each slot only needs 20 courses
+        # 3 distribute timeslots for each course, each slot only needs 20 courses
         core_slots = [[] for _ in range(4)]
         # assign the core classes
         for core in range(20):
@@ -162,9 +164,7 @@ class TimetableGenerator:
                 if len(elect_slots[slot]) == 20:
                     avail_slots.remove(slot)
 
-        print("elective slots", elect_slots)
-
-        # 1.6 distribute the rooms for each course
+        # 4 distribute the rooms for each course
         if grade == "G1":
             slots = core_slots + elect_slots
         else:
@@ -174,7 +174,6 @@ class TimetableGenerator:
         for index, slot in enumerate(slots):
             filled_room = dict(zip(range(2, 9), [set() for _ in range(2, 9)]))
             for course in slot:
-                print(course)
                 if course[:3] == "Sci":  # sci courses are distributed to three floors
                     floor = random.choice([6, 7, 8])  # TODO: change to greedy floor
                 else:
@@ -184,15 +183,9 @@ class TimetableGenerator:
                         continue
                 # divide by the current filled rooms, use mod because the core slots for g1 are elective slots for g2
                 room = random.choice(list(self.avail_rooms[floor] - filled_room[floor] - self.filled_rooms[(index + 4) % 8][floor]))
-                if grade == "G2":
-                    print(self.filled_rooms[(index + 4) % 8][floor])
                 rooms[course] = self.map_building(room) + str(room)
-                print(course, floor, room)
                 filled_room[floor].add(room)
-                print(index, filled_room)
             filled_rooms.append(filled_room)
-
-        print(filled_rooms)
 
         # update the global filled_rooms
         for i in range(8):
@@ -200,16 +193,13 @@ class TimetableGenerator:
                 self.filled_rooms[i][j].update(filled_rooms[i][j])
                 # [514, 519, 521, 523, 530, 531, 532, 533, 534, 502, 504, 508, 511]
 
-        print(self.filled_rooms)
-
-        print(rooms)
-        # 1.7 distribute each student's list of courses taken
+        # 5 distribute each student's list of courses taken
         if grade == "G1":
-            offset = 22000
+            offset = 23000
         else:
-            offset = 21000
+            offset = 22000
         students = dict(zip(range(offset+1, offset+501), [[] for _ in range(500)]))
-        # 1.7.1 assign each student to a core class (#0 - 19)
+        # assign each student to a core class (#0 - 19)
         core_counts = [0 for _ in range(20)]  # track the number of students in each core class
         cores = list(range(20))
         for student in students:
@@ -220,7 +210,7 @@ class TimetableGenerator:
                 cores.remove(core)
 
         elect_slots_copy = copy.deepcopy(elect_slots)
-        # 1.7.2 assign each student to an elective class
+        # assign each student to an elective class
         filled_courses = {i: dict(zip(elect_slots_copy[i], [0] * 20)) for i in range(4)}  # track the filled courses for each slot
         for student in students:
             for i, slot in enumerate(elect_slots_copy):
@@ -230,8 +220,7 @@ class TimetableGenerator:
                 if filled_courses[i][course] == 25:
                     elect_slots_copy[i].remove(course)
 
-        print(students)
-        print(elect_slots)
+        # 6 projection back
         timetable = {str(i): {str(j): {str(k): "G" for k in range(1, 11)} for j in range(1, 6)} for i in range(offset+1, offset+501)}
         filled_rooms.append(dict(zip(range(2, 9), [set() for _ in range(2, 9)])))  # additional slot to hold the extra english and PE class
         if grade == "G1":
@@ -247,11 +236,9 @@ class TimetableGenerator:
                         day, p1, p2 = self.glevel_set_map[core_set][index][0].split("_")
                         timetable[str(k)][day][p1] = rooms[course]
                         timetable[str(k)][day][p2] = rooms[course]
-                        print(f"{k} {day} {p1} {p2}")
                         day, p1, p2 = self.glevel_set_map[core_set][index][1].split("_")
                         timetable[str(k)][day][p1] = rooms[course]
                         timetable[str(k)][day][p2] = rooms[course]
-                        print(f"{k} {day} {p1} {p2}")
                 if course.split("_")[0] == 'Eng' and int(course.split("_")[-1]) <= 9:  # handle the extra english and PE class to spare slots
                     timetable[str(k)]['4']['1'] = rooms[course]
                     timetable[str(k)]['4']['2'] = rooms[course]
@@ -271,22 +258,321 @@ class TimetableGenerator:
                         day, p1, p2 = self.glevel_set_map[elect_set][index][0].split("_")
                         timetable[str(k)][day][p1] = rooms[course]
                         timetable[str(k)][day][p2] = rooms[course]
-                        print(f"{k} {day} {p1} {p2}")
                         day, p1, p2 = self.glevel_set_map[elect_set][index][1].split("_")
                         timetable[str(k)][day][p1] = rooms[course]
                         timetable[str(k)][day][p2] = rooms[course]
-                        print(f"{k} {day} {p1} {p2}")
 
         self.filled_rooms[8][5].update(filled_rooms[8][5])
-
-        print("filled", self.filled_rooms)
+        self.time_table.update(timetable)
 
         return timetable
 
+    def generate_as_al_level(self):
+        """
+        Generate AS-Level Classes
+        1: Find the total number of classes for each of the categories: Extra(1F), Bus(2F), Hum(3F), Enr(4F), Lan(5F), Sci(6F)
+            1.1 assume that each student take 1 Eng and 4 Electives -> 5*3=15 2-periods per week for a student
+            1.2 5*500/25=100 2-periods courses in total
+        2: distribute 100 courses into Extra, Bus, Hum, Enr, Lan, Sci following common-sense weightings (dict "as_freq")
+            2.1 Extra (art/drama/pe/music): 4
+            2.2 Bus (econ/acc): 10
+            2.3 Hum (geo/his/psy): 10
+            2.4 Mat (mat/further/cs): 23
+            2.5 Eng (lit/lan/gc/3rd lan): 23
+            2.6 Sci (bio/phy/chem): 30
+        3: distribute timeslots for each course
+            3.1 assign fixed scheduling
+                - each slot accounts for 3 2-periods in AS
+                - there are in total 6 slots for AS -> don't need to fill in every slot
+            3.2 define schedule sets
+                1. Mon12, Tue78, Thu34
+                2. Mon34, Tue90, Thu78
+                3. Mon78, Wed12, Thu90
+                4. Mon90, Wed34, Fri12
+                5. Tue12, Wed78, Fri34
+                6. Tue34, Thu12, Fri56
+        4: distribute the rooms for each course
+            4.1 the rooms available for each floor is stored in the dict "avail_rooms"
+            4.2 limitations: courses at each scheduling set should not have the same room
+                - should check "filled_rooms" when handling this
+                - hence, process "filled_rooms" into a timetable format
+        5: distribute each student's list of courses taken
+        6: project back to generate the timetable
+
+
+        :return: timetable as a JSON
+        """
+        # dictionary for as course frequencies
+        as_freq = {
+            "Extra": 4,
+            "Bus": 10,
+            "Hum": 10,
+            "Enr": 23,
+            "Eng": 23,
+            "Sci": 30
+        }
+        # dictionary for as course scheduling sets
+        as_set_map = {
+            0: ["1_1_2", "2_7_8", "4_3_4"],
+            1: ["1_3_4", "2_9_10", "4_7_8"],
+            2: ["1_7_8", "3_1_2", "4_9_10"],
+            3: ["1_9_10", "3_3_4", "5_1_2"],
+            4: ["2_1_2", "3_7_8", "5_3_4"],
+            5: ["2_3_4", "4_1_2", "5_7_8"]
+        }
+        # Procedures #
+        # 3 distribute timeslots for each course, each slot only needs 20 courses
+        slots = [[] for _ in range(6)]
+        avail_slots = list(range(6))
+        for k, v in as_freq.items():
+            for i in range(v):
+                slot = random.choice(avail_slots)
+                slots[slot].append(k + "_" + str(i))
+                if len(slots[slot]) == 20:
+                    avail_slots.remove(slot)
+
+        # 4 distribute the rooms for each course
+        # transform the g_level filled_rooms into a timetable format
+        filled_timetable = {str(j): {str(k): set() for k in range(1, 11)} for j in range(1, 6)}
+        glevel_set_map = list(self.glevel_set_map[0].values()) + list(self.glevel_set_map[1].values())
+        for index, slot in enumerate(self.filled_rooms[:8]):  # don't include the extra two slots at last
+            for v in slot.values():
+                for room in v:
+                    day, p1, p2 = glevel_set_map[index][0].split("_")
+                    filled_timetable[day][p1].add(room)
+                    filled_timetable[day][p2].add(room)
+                    day, p1, p2 = glevel_set_map[index][1].split("_")
+                    filled_timetable[day][p1].add(room)
+                    filled_timetable[day][p2].add(room)
+        for index, slot in enumerate(self.filled_rooms[8:]):  # process the last two extra slots
+            for v in slot.values():
+                for room in v:
+                    filled_timetable['3']['7'].add(int(room[1:]))
+                    filled_timetable['3']['8'].add(int(room[1:]))
+                    filled_timetable['4']['1'].add(int(room[1:]))
+                    filled_timetable['4']['2'].add(int(room[1:]))
+
+        # 4 distribute the rooms for each course
+        rooms = {}
+        filled_rooms = []  # track the filled rooms for each floor for each slot
+        for index, slot in enumerate(slots):
+            day1, p11, p12 = as_set_map[index][0].split("_")
+            day2, p21, p22 = as_set_map[index][1].split("_")
+            day3, p31, p32 = as_set_map[index][2].split("_")
+            filled_room = dict(zip(range(2, 9), [set() for _ in range(2, 9)]))
+            for course in slot:
+                if course[:3] == "Sci":  # sci courses are distributed to three floors
+                    floor = random.choice([6, 7, 8])  # TODO: change to greedy floor
+                else:
+                    floor = self.floor_map[course.split("_")[0]]
+                    if floor == 1:  # if it is extra, just assign G
+                        rooms[course] = "G"
+                        continue
+                # divide by the current filled rooms, use mod because the core slots for g1 are elective slots for g2
+                room = random.choice(
+                    list(self.avail_rooms[floor] - filled_timetable[day1][p11] - filled_timetable[day2][p21] - filled_timetable[day3][p31]))
+                rooms[course] = self.map_building(room) + str(room)
+                filled_room[floor].add(room)
+            filled_rooms.append(filled_room)
+
+        # 5 distribute each student's list of courses taken
+        # generate the students' slots
+        slots_count = [[i, len(slot)*25] for i, slot in enumerate(slots)]
+        offset = 21000
+        students_slots = {i: [] for i in range(offset+1, offset+501)}
+        for student in students_slots:
+            slots_count = sorted(slots_count, reverse=True, key=lambda x: x[1])
+            slots_indices = [item[0] for item in slots_count[:5]]
+            students_slots[student] = slots_indices
+            for i in range(6):
+                if slots_count[i][0] in slots_indices:
+                    slots_count[i][1] -= 1
+
+        # print(students_slots)
+
+        # generate the students
+        students = {i: [] for i in range(offset+1, offset+501)}
+        slots_copy = copy.deepcopy(slots)
+        filled_courses = {i: dict(zip(slots_copy[i], [0] * len(slots_copy[i]))) for i in range(6)}  # track the filled courses for each slot
+        for student in students:
+            # print(student)
+            for i in students_slots[student]:
+                slot = slots_copy[i]
+                course = random.choice(slot)
+                students[student].append(course)
+                filled_courses[i][course] += 1
+                if filled_courses[i][course] == 25:
+                    slots_copy[i].remove(course)
+        
+        # 5 generate the timetable
+        timetable = {str(i): {str(j): {str(k): "G" for k in range(1, 11)} for j in range(1, 6)} for i in range(offset+1, offset+501)}
+        for k, student in students.items():
+            for course in student:
+                for index, slot in enumerate(slots):
+                    if course in slot:
+                        day, p1, p2 = as_set_map[index][0].split("_")
+                        timetable[str(k)][day][p1] = rooms[course]
+                        timetable[str(k)][day][p2] = rooms[course]
+                        day, p1, p2 = as_set_map[index][1].split("_")
+                        timetable[str(k)][day][p1] = rooms[course]
+                        timetable[str(k)][day][p2] = rooms[course]
+                        day, p1, p2 = as_set_map[index][2].split("_")
+                        timetable[str(k)][day][p1] = rooms[course]
+                        timetable[str(k)][day][p2] = rooms[course]
+        
+        """Generate AL Level, written in the same function to avoid passing filled_rooms which is hard for different set maps"""
+        """
+        Generate AL-Level Classes
+        1: Find the total number of classes for each of the categories: Extra(1F), Bus(2F), Hum(3F), Enr(4F), Lan(5F), Sci(6F)
+            1.1 assume that each student take 1 Eng and 3 Electives -> 4*3=12 2-periods per week for a student
+            1.2 4*500/25=80 2-periods courses in total
+        2: distribute 80 courses into Extra, Bus, Hum, Enr, Lan, Sci following common-sense weightings (dict "al_freq")
+            2.1 Extra (art/drama/pe/music): 4
+            2.2 Bus (econ/acc): 12
+            2.3 Hum (geo/his/psy): 10
+            2.4 Mat (mat/further/cs): 15
+            2.5 Eng (lit/lan/gc/3rd lan): 23
+            2.6 Sci (bio/phy/chem): 20
+        3: distribute timeslots for each course
+            3.1 assign fixed scheduling
+                - each slot accounts for 3 2-periods in AL
+                - the set map for AL is the same as that for AS
+            3.2 define schedule sets
+                1. Mon12, Tue78, Thu34
+                2. Mon34, Tue90, Thu78
+                3. Mon78, Wed12, Thu90
+                4. Mon90, Wed34, Fri12
+                5. Tue12, Wed78, Fri34
+                6. Tue34, Thu12, Fri56
+        4: distribute the rooms for each course
+            4.1 the rooms available for each floor is stored in the dict "avail_rooms"
+            4.2 limitations: courses at each scheduling set should not have the same room
+                - should check "filled_rooms" when handling this
+                - hence, process "filled_rooms" into a timetable format
+        5: distribute each student's list of courses taken
+        6: project back to generate the timetable
+
+
+        :return: timetable as a JSON
+        """
+        al_freq = {
+            "Extra": 4,
+            "Bus": 12,
+            "Hum": 10,
+            "Enr": 15,
+            "Eng": 23,
+            "Sci": 20
+        }
+
+        # PROCEDURES #
+        # 3 distribute timeslots for each course, each slot only needs 20 courses
+        slots = [[] for _ in range(6)]
+        avail_slots = list(range(6))
+        for k, v in al_freq.items():
+            for i in range(v):
+                slot = random.choice(avail_slots)
+                slots[slot].append(k + "_" + str(i))
+                if len(slots[slot]) == 20:
+                    avail_slots.remove(slot)
+
+        # 4 distribute the rooms for each course
+        rooms = {}
+        for index, slot in enumerate(slots):
+            day1, p11, p12 = as_set_map[index][0].split("_")
+            day2, p21, p22 = as_set_map[index][1].split("_")
+            day3, p31, p32 = as_set_map[index][2].split("_")
+            filled_room = dict(zip(range(2, 9), [set() for _ in range(2, 9)]))
+            for course in slot:
+                if course[:3] == "Sci":  # sci courses are distributed to three floors
+                    floor = random.choice([6, 7, 8])  # TODO: change to greedy floor
+                else:
+                    floor = self.floor_map[course.split("_")[0]]
+                    if floor == 1:  # if it is extra, just assign G
+                        rooms[course] = "G"
+                        continue
+                # divide by the current filled rooms, use mod because the core slots for g1 are elective slots for g2
+                room = random.choice(
+                    list(self.avail_rooms[floor] - filled_timetable[day1][p11] - filled_timetable[day2][p21] 
+                         - filled_timetable[day3][p31] - filled_rooms[index][floor]))  # minus the as time slots as well
+                rooms[course] = self.map_building(room) + str(room)
+                filled_room[floor].add(room)
+        
+        # 5 distribute each student's list of courses taken
+        # generate the students' slots
+        slots_count = [[i, len(slot)*25] for i, slot in enumerate(slots)]
+        offset = 20000
+        students_slots = {i: [] for i in range(offset+1, offset+501)}
+        for student in students_slots:
+            slots_count = sorted(slots_count, reverse=True, key=lambda x: x[1])
+            slots_indices = [item[0] for item in slots_count[:4]]
+            students_slots[student] = slots_indices
+            for i in range(6):
+                if slots_count[i][0] in slots_indices:
+                    slots_count[i][1] -= 1
+
+        # print(students_slots)
+
+        # generate the students
+        students = {i: [] for i in range(offset+1, offset+501)}
+        slots_copy = copy.deepcopy(slots)
+        filled_courses = {i: dict(zip(slots_copy[i], [0] * len(slots_copy[i]))) for i in range(6)}  # track the filled courses for each slot
+        for student in students:
+            # print(student)
+            for i in students_slots[student]:
+                slot = slots_copy[i]
+                course = random.choice(slot)
+                students[student].append(course)
+                filled_courses[i][course] += 1
+                if filled_courses[i][course] == 25:
+                    slots_copy[i].remove(course)
+        
+        # 5 generate the timetable
+        al_timetable = {str(i): {str(j): {str(k): "G" for k in range(1, 11)} for j in range(1, 6)} for i in range(offset+1, offset+501)}
+        for k, student in students.items():
+            for course in student:
+                for index, slot in enumerate(slots):
+                    if course in slot:
+                        day, p1, p2 = as_set_map[index][0].split("_")
+                        al_timetable[str(k)][day][p1] = rooms[course]
+                        al_timetable[str(k)][day][p2] = rooms[course]
+                        day, p1, p2 = as_set_map[index][1].split("_")
+                        al_timetable[str(k)][day][p1] = rooms[course]
+                        al_timetable[str(k)][day][p2] = rooms[course]
+                        day, p1, p2 = as_set_map[index][2].split("_")
+                        al_timetable[str(k)][day][p1] = rooms[course]
+                        al_timetable[str(k)][day][p2] = rooms[course]
+        
+        timetable.update(al_timetable)
+        self.time_table.update(timetable)
+
+        return timetable
+
+    def add_pshe(self):
+        student_list = list(self.time_table.keys())
+        offset = 0
+        flag = True
+        for floor in self.avail_rooms.values():
+            for room in floor:
+                for i in range(offset, offset+25):
+                    if i >= len(student_list):
+                        flag = False
+                        break
+                    self.time_table[student_list[i]]['3']['5'] = self.map_building(room) + str(room)
+                if not flag:
+                    break
+                offset += 25
+            if not flag:
+                break
+
+        return self.time_table
+                
+
 
 if __name__ == "__main__":
+    # Need to generate multiple times so that the rooms not crash, therefore creating no errors
     generator = TimetableGenerator()
     time_table1 = generator.generate_g_level("G1")
     time_table2 = generator.generate_g_level("G2")
-    print(time_table1)
-    print(time_table2)
+    time_table3 = generator.generate_as_al_level()
+    generator.add_pshe()
+
