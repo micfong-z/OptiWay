@@ -2,6 +2,27 @@
 
 # The "distance" between stairs are relative lengths approximated
 # using average walking time in empty staircases.
+
+
+# Path types:
+# 0: Normal path between two rooms / between a room and one end of a bridge
+# 1: Bridge between two buildings
+# 2: Normal staircases (e.g. S2-3)
+# 3: Spiral staircases between two floors only (e.g. S2-2)
+# 4: Other types of staircases (e.g. S4-6)
+
+# Keys:
+#   - X: Crossings between two blocks
+#     XNKM: The M-th crossing node on K block, N-th floor.
+#   - A: Nodes in the A block
+#   - B: Nodes in the B block
+#   - S: Stairs
+#     SN-M: The M-th stair node on N-th floor.
+
+# Format of paths.txt
+# [node 1] [node 2] [distance] [path type]
+# Note that the path is undirected.
+
 S:
   X: # dummy
   A:
