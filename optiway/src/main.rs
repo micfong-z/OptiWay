@@ -9,7 +9,10 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         "OptiWay",
         native_options,
-        Box::new(|cc| Box::new(optiway::OptiWayApp::new(cc))),
+        Box::new(|cc| {
+            // egui_extras::install_image_loaders(&cc.egui_ctx);
+            Box::new(optiway::OptiWayApp::new(cc))
+        }),
     )
 }
 
