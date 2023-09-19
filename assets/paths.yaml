@@ -1,0 +1,1482 @@
+# Stairs and crossings are manually added.
+
+# The "distance" between stairs are relative lengths approximated
+# using average walking time in empty staircases.
+
+
+# Path types:
+# 0: Normal path between two rooms / between a room and one end of a bridge
+# 1: Bridge between two buildings
+# 2: Normal staircases (e.g. S2-3)
+# 3: Spiral staircases between two floors only (e.g. S2-2)
+# 4: Other types of staircases (e.g. S4-6)
+
+# Keys:
+#   - X: Crossings between two blocks
+#     XNKM: The M-th crossing node on K block, N-th floor.
+#   - A: Nodes in the A block
+#   - B: Nodes in the B block
+#   - S: Stairs
+#     SN-M: The M-th stair node on N-th floor.
+
+# Format of paths.txt
+# [node 1] [node 2] [distance] [path type]
+# Note that the path is undirected.
+
+S:
+  X: # dummy
+  A:
+  - dist: 190
+    nodes:
+    - S2-1
+    - S3-1
+    type: 2
+  - dist: 190
+    nodes:
+    - S3-1
+    - S4-1
+    type: 2
+  - dist: 190
+    nodes:
+    - S4-1
+    - S5-1
+    type: 2
+  - dist: 190
+    nodes:
+    - S5-1
+    - S6-1
+    type: 2
+  - dist: 190
+    nodes:
+    - S6-1
+    - S7-1
+    type: 2
+  - dist: 190
+    nodes:
+    - S3-2
+    - S4-2
+    type: 3
+  - dist: 190
+    nodes:
+    - S3-3
+    - S2-2
+    type: 3
+  - dist: 190
+    nodes:
+    - S2-3
+    - S3-4
+    type: 2
+  - dist: 190
+    nodes:
+    - S3-4
+    - S4-3
+    type: 2
+  - dist: 190
+    nodes:
+    - S4-3
+    - S5-2
+    type: 2
+  - dist: 190
+    nodes:
+    - S5-2
+    - S6-2
+    type: 2
+  - dist: 190
+    nodes:
+    - S6-2
+    - S7-2
+    type: 2
+  - dist: 190
+    nodes:
+    - S7-2
+    - S8-1
+    type: 2
+  - dist: 190
+    nodes:
+    - S4-4
+    - S5-3
+    type: 3
+  - dist: 190
+    nodes:
+    - S5-4
+    - S6-3
+    type: 3
+  - dist: 190
+    nodes:
+    - S2-4
+    - S3-5
+    type: 2
+  - dist: 190
+    nodes:
+    - S3-5
+    - S4-5
+    type: 2
+  - dist: 190
+    nodes:
+    - S4-5
+    - S5-5
+    type: 2
+  - dist: 190
+    nodes:
+    - S5-5
+    - S6-4
+    type: 2
+  - dist: 190
+    nodes:
+    - S6-4
+    - S7-3
+    type: 2
+  - dist: 190
+    nodes:
+    - S7-3
+    - S8-2
+    type: 2
+  - dist: 190
+    nodes:
+    - S4-6
+    - S5-6
+    type: 4
+  B:
+  - dist: 190
+    nodes:
+    - S2-7
+    - S3-9
+    type: 2
+  - dist: 190
+    nodes:
+    - S3-9
+    - S4-10
+    type: 2
+  - dist: 190
+    nodes:
+    - S4-10
+    - S5-10
+    type: 2
+  - dist: 190
+    nodes:
+    - S5-10
+    - S6-8
+    type: 2
+  - dist: 190
+    nodes:
+    - S6-8
+    - S7-7
+    type: 2
+  - dist: 190
+    nodes:
+    - S7-6
+    - S8-5
+    type: 3
+  - dist: 190
+    nodes:
+    - S2-6
+    - S3-8
+    type: 2
+  - dist: 190
+    nodes:
+    - S3-8
+    - S4-9
+    type: 2
+  - dist: 190
+    nodes:
+    - S4-9
+    - S5-9
+    type: 2
+  - dist: 190
+    nodes:
+    - S5-9
+    - S6-7
+    type: 2
+  - dist: 190
+    nodes:
+    - S6-7
+    - S7-5
+    type: 2
+  - dist: 190
+    nodes:
+    - S7-5
+    - S8-4
+    type: 2
+  - dist: 190
+    nodes:
+    - S5-8
+    - S6-6
+    type: 3
+  - dist: 190
+    nodes:
+    - S2-5
+    - S3-6
+    type: 2
+  - dist: 190
+    nodes:
+    - S3-6
+    - S4-7
+    type: 2
+  - dist: 190
+    nodes:
+    - S4-7
+    - S5-7
+    type: 2
+  - dist: 190
+    nodes:
+    - S5-7
+    - S6-5
+    type: 2
+  - dist: 190
+    nodes:
+    - S6-5
+    - S7-4
+    type: 2
+  - dist: 190
+    nodes:
+    - S7-4
+    - S8-3
+    type: 2
+2F:
+  X:
+  - dist: 280
+    nodes:
+    - X2A1
+    - X2B1
+    type: 1
+  - dist: 280
+    nodes:
+    - X2A2
+    - X2B2
+    type: 1
+  A:
+  - dist: 105
+    nodes:
+    - A201
+    - A202
+    type: 0
+  - dist: 75
+    nodes:
+    - A202
+    - S2-1
+    type: 0
+  - dist: 160
+    nodes:
+    - S2-1
+    - A204
+    type: 0
+  - dist: 95
+    nodes:
+    - A204
+    - A205
+    type: 0
+  - dist: 110
+    nodes:
+    - A205
+    - A206
+    type: 0
+  - dist: 110
+    nodes:
+    - A206
+    - A207
+    type: 0
+  - dist: 110
+    nodes:
+    - A207
+    - A208
+    type: 0
+  - dist: 105
+    nodes:
+    - A208
+    - S2-2
+    type: 0
+  - dist: 105
+    nodes:
+    - S2-2
+    - A210
+    type: 0
+  - dist: 110
+    nodes:
+    - A210
+    - A211
+    type: 0
+  - dist: 110
+    nodes:
+    - A211
+    - S2-3
+    type: 0
+  - dist: 105
+    nodes:
+    - S2-3
+    - A212
+    type: 0
+  - dist: 70
+    nodes:
+    - A212
+    - A213
+    type: 0
+  - dist: 110
+    nodes:
+    - A213
+    - A214
+    type: 0
+  - dist: 145
+    nodes:
+    - A214
+    - A215
+    type: 0
+  - dist: 110
+    nodes:
+    - A215
+    - A216
+    type: 0
+  - dist: 95
+    nodes:
+    - A216
+    - A217
+    type: 0
+  - dist: 115
+    nodes:
+    - A217
+    - S2-4
+    type: 0
+  - dist: 130
+    nodes:
+    - S2-4
+    - A219
+    type: 0
+  - dist: 110
+    nodes:
+    - A219
+    - A220
+    type: 0
+  B:
+  - dist: 95
+    nodes:
+    - B221
+    - S2-5
+    type: 0
+  - dist: 105
+    nodes:
+    - S2-5
+    - B222
+    type: 0
+  - dist: 110
+    nodes:
+    - B222
+    - B223
+    type: 0
+  - dist: 110
+    nodes:
+    - B223
+    - B224
+    type: 0
+  - dist: 110
+    nodes:
+    - B224
+    - B225
+    type: 0
+  - dist: 105
+    nodes:
+    - B225
+    - B226
+    type: 0
+  - dist: 115
+    nodes:
+    - B226
+    - B227
+    type: 0
+  - dist: 115
+    nodes:
+    - B227
+    - B228
+    type: 0
+  - dist: 75
+    nodes:
+    - B228
+    - B229
+    type: 0
+  - dist: 115
+    nodes:
+    - B229
+    - S2-6
+    type: 0
+  - dist: 140
+    nodes:
+    - S2-6
+    - B231
+    type: 0
+  - dist: 80
+    nodes:
+    - B231
+    - B232
+    type: 0
+  - dist: 70
+    nodes:
+    - B232
+    - B233
+    type: 0
+  - dist: 80
+    nodes:
+    - B233
+    - B235
+    type: 0
+  - dist: 65
+    nodes:
+    - B235
+    - B237
+    type: 0
+  - dist: 65
+    nodes:
+    - B237
+    - B239
+    type: 0
+  - dist: 80
+    nodes:
+    - B239
+    - B241
+    type: 0
+  - dist: 95
+    nodes:
+    - B241
+    - S2-7
+    type: 0
+3F:
+  X:
+  - dist: 280
+    nodes:
+    - X3A1
+    - X3B1
+    type: 1
+  - dist: 280
+    nodes:
+    - X3A2
+    - X3B2
+    type: 1
+  A:
+  - dist: 105
+    nodes:
+    - A301
+    - A302
+    type: 0
+  - dist: 75
+    nodes:
+    - A302
+    - S3-1
+    type: 0
+  - dist: 160
+    nodes:
+    - S3-1
+    - S3-2
+    type: 0
+  - dist: 95
+    nodes:
+    - S3-2
+    - A305
+    type: 0
+  - dist: 110
+    nodes:
+    - A305
+    - A306
+    type: 0
+  - dist: 110
+    nodes:
+    - A306
+    - A307
+    type: 0
+  - dist: 110
+    nodes:
+    - A307
+    - A308
+    type: 0
+  - dist: 105
+    nodes:
+    - A308
+    - S3-3
+    type: 0
+  - dist: 105
+    nodes:
+    - S3-3
+    - A310
+    type: 0
+  - dist: 110
+    nodes:
+    - A310
+    - A311
+    type: 0
+  - dist: 110
+    nodes:
+    - A311
+    - S3-4
+    type: 0
+  - dist: 105
+    nodes:
+    - S3-4
+    - A312
+    type: 0
+  - dist: 160
+    nodes:
+    - A312
+    - A313
+    type: 0
+  - dist: 165
+    nodes:
+    - A313
+    - A314
+    type: 0
+  - dist: 110
+    nodes:
+    - A314
+    - A315
+    type: 0
+  - dist: 95
+    nodes:
+    - A315
+    - A316
+    type: 0
+  - dist: 115
+    nodes:
+    - A316
+    - S3-5
+    type: 0
+  - dist: 130
+    nodes:
+    - S3-5
+    - A318
+    type: 0
+  - dist: 110
+    nodes:
+    - A318
+    - A319
+    type: 0
+  B:
+  - dist: 95
+    nodes:
+    - B320
+    - S3-6
+    type: 0
+  - dist: 40
+    nodes:
+    - S3-6
+    - B321
+    type: 0
+  - dist: 70
+    nodes:
+    - B321
+    - S3-7
+    type: 0
+  - dist: 105
+    nodes:
+    - S3-7
+    - B323
+    type: 0
+  - dist: 110
+    nodes:
+    - B323
+    - B324
+    type: 0
+  - dist: 110
+    nodes:
+    - B324
+    - B325
+    type: 0
+  - dist: 170
+    nodes:
+    - B325
+    - B326
+    type: 0
+  - dist: 190
+    nodes:
+    - B326
+    - B327
+    type: 0
+  - dist: 165
+    nodes:
+    - B327
+    - S3-8
+    type: 0
+  - dist: 140
+    nodes:
+    - S3-8
+    - B329
+    type: 0
+  - dist: 100
+    nodes:
+    - B329
+    - B330
+    type: 0
+  - dist: 105
+    nodes:
+    - B330
+    - B331
+    type: 0
+  - dist: 110
+    nodes:
+    - B331
+    - B332
+    type: 0
+  - dist: 110
+    nodes:
+    - B332
+    - B333
+    type: 0
+  - dist: 110
+    nodes:
+    - B333
+    - S3-9
+    type: 0
+4F:
+  X:
+  - dist: 280
+    nodes:
+    - X4A1
+    - X4B1
+    type: 1
+  - dist: 280
+    nodes:
+    - X4A2
+    - X4B2
+    type: 1
+  - dist: 280
+    nodes:
+    - X4A3
+    - X4B3
+    type: 1
+  A:
+  - dist: 105
+    nodes:
+    - A401
+    - A402
+    type: 0
+  - dist: 75
+    nodes:
+    - A402
+    - S4-1
+    type: 0
+  - dist: 160
+    nodes:
+    - S4-1
+    - S4-2
+    type: 0
+  - dist: 110
+    nodes:
+    - S4-2
+    - A405
+    type: 0
+  - dist: 95
+    nodes:
+    - A405
+    - A406
+    type: 0
+  - dist: 110
+    nodes:
+    - A406
+    - A407
+    type: 0
+  - dist: 110
+    nodes:
+    - A407
+    - A408
+    type: 0
+  - dist: 105
+    nodes:
+    - A408
+    - A409
+    type: 0
+  - dist: 105
+    nodes:
+    - A409
+    - A410
+    type: 0
+  - dist: 110
+    nodes:
+    - A410
+    - A411
+    type: 0
+  - dist: 110
+    nodes:
+    - A411
+    - S4-3
+    type: 0
+  - dist: 105
+    nodes:
+    - S4-3
+    - S4-4
+    type: 0
+  - dist: 70
+    nodes:
+    - S4-4
+    - A413
+    type: 0
+  - dist: 110
+    nodes:
+    - A413
+    - A414
+    type: 0
+  - dist: 145
+    nodes:
+    - A414
+    - A415
+    type: 0
+  - dist: 110
+    nodes:
+    - A415
+    - A416
+    type: 0
+  - dist: 95
+    nodes:
+    - A416
+    - A417
+    type: 0
+  - dist: 115
+    nodes:
+    - A417
+    - S4-5
+    type: 0
+  - dist: 130
+    nodes:
+    - S4-5
+    - A419
+    type: 0
+  - dist: 110
+    nodes:
+    - A419
+    - S4-6
+    type: 0
+  B:
+  - dist: 95
+    nodes:
+    - B421
+    - S4-7
+    type: 0
+  - dist: 110
+    nodes:
+    - S4-7
+    - S4-8
+    type: 0
+  - dist: 105
+    nodes:
+    - S4-8
+    - B423
+    type: 0
+  - dist: 110
+    nodes:
+    - B423
+    - B424
+    type: 0
+  - dist: 110
+    nodes:
+    - B424
+    - B425
+    type: 0
+  - dist: 170
+    nodes:
+    - B425
+    - B426
+    type: 0
+  - dist: 190
+    nodes:
+    - B426
+    - B427
+    type: 0
+  - dist: 165
+    nodes:
+    - B427
+    - S4-9
+    type: 0
+  - dist: 140
+    nodes:
+    - S4-9
+    - B429
+    type: 0
+  - dist: 100
+    nodes:
+    - B429
+    - B430
+    type: 0
+  - dist: 105
+    nodes:
+    - B430
+    - B431
+    type: 0
+  - dist: 110
+    nodes:
+    - B431
+    - B432
+    type: 0
+  - dist: 110
+    nodes:
+    - B432
+    - B433
+    type: 0
+  - dist: 110
+    nodes:
+    - B433
+    - S4-10
+    type: 0
+5F:
+  X:
+  - dist: 280
+    nodes:
+    - X5A1
+    - X5B1
+    type: 1
+  - dist: 280
+    nodes:
+    - X5A2
+    - X5B2
+    type: 1
+  - dist: 280
+    nodes:
+    - X5A3
+    - X5B3
+    type: 1
+  - dist: 280
+    nodes:
+    - X5A4
+    - X5B4
+    type: 1
+  A:
+  - dist: 105
+    nodes:
+    - A501
+    - A502
+    type: 0
+  - dist: 75
+    nodes:
+    - A502
+    - S5-1
+    type: 0
+  - dist: 160
+    nodes:
+    - S5-1
+    - A504
+    type: 0
+  - dist: 95
+    nodes:
+    - A504
+    - A505
+    type: 0
+  - dist: 110
+    nodes:
+    - A505
+    - A506
+    type: 0
+  - dist: 110
+    nodes:
+    - A506
+    - A507
+    type: 0
+  - dist: 110
+    nodes:
+    - A507
+    - A508
+    type: 0
+  - dist: 105
+    nodes:
+    - A508
+    - A509
+    type: 0
+  - dist: 105
+    nodes:
+    - A509
+    - A510
+    type: 0
+  - dist: 110
+    nodes:
+    - A510
+    - A511
+    type: 0
+  - dist: 110
+    nodes:
+    - A511
+    - S5-2
+    type: 0
+  - dist: 105
+    nodes:
+    - S5-2
+    - S5-3
+    type: 0
+  - dist: 120
+    nodes:
+    - S5-3
+    - A513
+    type: 0
+  - dist: 95
+    nodes:
+    - A513
+    - A514
+    type: 0
+  - dist: 110
+    nodes:
+    - A514
+    - A515
+    type: 0
+  - dist: 110
+    nodes:
+    - A515
+    - A516
+    type: 0
+  - dist: 95
+    nodes:
+    - A516
+    - S5-4
+    type: 0
+  - dist: 115
+    nodes:
+    - S5-4
+    - S5-5
+    type: 0
+  - dist: 130
+    nodes:
+    - S5-5
+    - A519
+    type: 0
+  - dist: 110
+    nodes:
+    - A519
+    - S5-6
+    type: 0
+  B:
+  - dist: 95
+    nodes:
+    - B521
+    - S5-7
+    type: 0
+  - dist: 105
+    nodes:
+    - S5-7
+    - B522
+    type: 0
+  - dist: 110
+    nodes:
+    - B522
+    - B523
+    type: 0
+  - dist: 110
+    nodes:
+    - B523
+    - B524
+    type: 0
+  - dist: 110
+    nodes:
+    - B524
+    - B525
+    type: 0
+  - dist: 170
+    nodes:
+    - B525
+    - B526
+    type: 0
+  - dist: 165
+    nodes:
+    - B526
+    - S5-8
+    type: 0
+  - dist: 75
+    nodes:
+    - S5-8
+    - B528
+    type: 0
+  - dist: 115
+    nodes:
+    - B528
+    - S5-9
+    type: 0
+  - dist: 140
+    nodes:
+    - S5-9
+    - B530
+    type: 0
+  - dist: 100
+    nodes:
+    - B530
+    - B531
+    type: 0
+  - dist: 105
+    nodes:
+    - B531
+    - B532
+    type: 0
+  - dist: 110
+    nodes:
+    - B532
+    - B533
+    type: 0
+  - dist: 110
+    nodes:
+    - B533
+    - B534
+    type: 0
+  - dist: 110
+    nodes:
+    - B534
+    - S5-10
+    type: 0
+6F:
+  X:
+  - dist: 280
+    nodes:
+    - X6A1
+    - X6B1
+    type: 1
+  - dist: 280
+    nodes:
+    - X6A2
+    - X6B2
+    type: 1
+  - dist: 280
+    nodes:
+    - X6A3
+    - X6B3
+    type: 1
+  - dist: 280
+    nodes:
+    - X6A4
+    - X6B4
+    type: 1
+  A:
+  - dist: 105
+    nodes:
+    - A601
+    - A602
+    type: 0
+  - dist: 75
+    nodes:
+    - A602
+    - S6-1
+    type: 0
+  - dist: 160
+    nodes:
+    - S6-1
+    - A604
+    type: 0
+  - dist: 95
+    nodes:
+    - A604
+    - A605
+    type: 0
+  - dist: 110
+    nodes:
+    - A605
+    - A606
+    type: 0
+  - dist: 110
+    nodes:
+    - A606
+    - A607
+    type: 0
+  - dist: 160
+    nodes:
+    - A607
+    - A608
+    type: 0
+  - dist: 215
+    nodes:
+    - A608
+    - A609
+    type: 0
+  - dist: 165
+    nodes:
+    - A609
+    - S6-2
+    type: 0
+  - dist: 105
+    nodes:
+    - S6-2
+    - A610
+    type: 0
+  - dist: 105
+    nodes:
+    - A610
+    - A611
+    type: 0
+  - dist: 110
+    nodes:
+    - A611
+    - A612
+    type: 0
+  - dist: 150
+    nodes:
+    - A612
+    - A613
+    type: 0
+  - dist: 165
+    nodes:
+    - A613
+    - S6-3
+    type: 0
+  - dist: 115
+    nodes:
+    - S6-3
+    - S6-4
+    type: 0
+  - dist: 130
+    nodes:
+    - S6-4
+    - A616
+    type: 0
+  - dist: 110
+    nodes:
+    - A616
+    - A617
+    type: 0
+  B:
+  - dist: 95
+    nodes:
+    - B618
+    - S6-5
+    type: 0
+  - dist: 90
+    nodes:
+    - S6-5
+    - B619
+    type: 0
+  - dist: 95
+    nodes:
+    - B619
+    - B620
+    type: 0
+  - dist: 95
+    nodes:
+    - B620
+    - B621
+    type: 0
+  - dist: 140
+    nodes:
+    - B621
+    - B622
+    type: 0
+  - dist: 95
+    nodes:
+    - B622
+    - B623
+    type: 0
+  - dist: 95
+    nodes:
+    - B623
+    - B624
+    type: 0
+  - dist: 160
+    nodes:
+    - B624
+    - S6-6
+    type: 0
+  - dist: 75
+    nodes:
+    - S6-6
+    - B626
+    type: 0
+  - dist: 115
+    nodes:
+    - B626
+    - S6-7
+    type: 0
+  - dist: 140
+    nodes:
+    - S6-7
+    - B628
+    type: 0
+  - dist: 120
+    nodes:
+    - B628
+    - B629
+    type: 0
+  - dist: 105
+    nodes:
+    - B629
+    - B630
+    type: 0
+  - dist: 145
+    nodes:
+    - B630
+    - B631
+    type: 0
+  - dist: 165
+    nodes:
+    - B631
+    - S6-8
+    type: 0
+7F:
+  X:
+  - dist: 280
+    nodes:
+    - X7A1
+    - X7B1
+    type: 1
+  - dist: 280
+    nodes:
+    - X7A2
+    - X7B2
+    type: 1
+  - dist: 280
+    nodes:
+    - X7A3
+    - X7B3
+    type: 1
+  A:
+  - dist: 125
+    nodes:
+    - A701
+    - S7-1
+    type: 0
+  - dist: 165
+    nodes:
+    - S7-1
+    - A702
+    type: 0
+  - dist: 170
+    nodes:
+    - A702
+    - A703
+    type: 0
+  - dist: 110
+    nodes:
+    - A703
+    - A704
+    type: 0
+  - dist: 160
+    nodes:
+    - A704
+    - A705
+    type: 0
+  - dist: 145
+    nodes:
+    - A705
+    - A706
+    type: 0
+  - dist: 140
+    nodes:
+    - A706
+    - A707
+    type: 0
+  - dist: 125
+    nodes:
+    - A707
+    - S7-2
+    type: 0
+  - dist: 105
+    nodes:
+    - S7-2
+    - A708
+    type: 0
+  - dist: 85
+    nodes:
+    - A708
+    - A709
+    type: 0
+  - dist: 110
+    nodes:
+    - A709
+    - A710
+    type: 0
+  - dist: 150
+    nodes:
+    - A710
+    - A711
+    type: 0
+  - dist: 110
+    nodes:
+    - A711
+    - A712
+    type: 0
+  - dist: 75
+    nodes:
+    - A712
+    - A713
+    type: 0
+  - dist: 115
+    nodes:
+    - A713
+    - S7-3
+    type: 0
+  - dist: 185
+    nodes:
+    - S7-3
+    - A715
+    type: 0
+  B:
+  - dist: 75
+    nodes:
+    - B717
+    - B718
+    type: 0
+  - dist: 75
+    nodes:
+    - B718
+    - S7-4
+    type: 0
+  - dist: 90
+    nodes:
+    - S7-4
+    - B719
+    type: 0
+  - dist: 95
+    nodes:
+    - B719
+    - B720
+    type: 0
+  - dist: 95
+    nodes:
+    - B720
+    - B721
+    type: 0
+  - dist: 140
+    nodes:
+    - B721
+    - B722
+    type: 0
+  - dist: 95
+    nodes:
+    - B722
+    - B723
+    type: 0
+  - dist: 95
+    nodes:
+    - B723
+    - B724
+    type: 0
+  - dist: 90
+    nodes:
+    - B724
+    - B725
+    type: 0
+  - dist: 95
+    nodes:
+    - B725
+    - B726
+    type: 0
+  - dist: 165
+    nodes:
+    - B726
+    - S7-5
+    type: 0
+  - dist: 170
+    nodes:
+    - S7-5
+    - B728
+    type: 0
+  - dist: 155
+    nodes:
+    - B728
+    - B731
+    type: 0
+  - dist: 130
+    nodes:
+    - B731
+    - S7-6
+    type: 0
+  - dist: 110
+    nodes:
+    - S7-6
+    - B733
+    type: 0
+  - dist: 110
+    nodes:
+    - B733
+    - S7-7
+    type: 0
+8F:
+  X: # dummy
+  A:
+  - dist: 220
+    nodes:
+    - A801
+    - A802
+    type: 0
+  - dist: 215
+    nodes:
+    - A802
+    - A803
+    type: 0
+  - dist: 160
+    nodes:
+    - A803
+    - S8-1
+    type: 0
+  - dist: 105
+    nodes:
+    - S8-1
+    - A804
+    type: 0
+  - dist: 160
+    nodes:
+    - A804
+    - A805
+    type: 0
+  - dist: 220
+    nodes:
+    - A805
+    - A806
+    type: 0
+  - dist: 150
+    nodes:
+    - A806
+    - A807
+    type: 0
+  - dist: 115
+    nodes:
+    - A807
+    - S8-2
+    type: 0
+  - dist: 185
+    nodes:
+    - S8-2
+    - A809
+    type: 0
+  B:
+  - dist: 75
+    nodes:
+    - B811
+    - S8-3
+    type: 0
+  - dist: 90
+    nodes:
+    - S8-3
+    - B812
+    type: 0
+  - dist: 95
+    nodes:
+    - B812
+    - B813
+    type: 0
+  - dist: 95
+    nodes:
+    - B813
+    - B814
+    type: 0
+  - dist: 140
+    nodes:
+    - B814
+    - B815
+    type: 0
+  - dist: 95
+    nodes:
+    - B815
+    - B816
+    type: 0
+  - dist: 95
+    nodes:
+    - B816
+    - B817
+    type: 0
+  - dist: 90
+    nodes:
+    - B817
+    - B818
+    type: 0
+  - dist: 95
+    nodes:
+    - B818
+    - B819
+    type: 0
+  - dist: 165
+    nodes:
+    - B819
+    - S8-4
+    type: 0
+  - dist: 170
+    nodes:
+    - S8-4
+    - B821
+    type: 0
+  - dist: 285
+    nodes:
+    - B821
+    - S8-5
+    type: 0
