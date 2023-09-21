@@ -20,6 +20,8 @@ image = { version = "0.24", default-features = false, features = [
     "jpeg",
     "png",
 ] }
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.8"
 
 # serde = { version = "1", features = ["derive"] }
 

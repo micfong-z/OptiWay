@@ -1,6 +1,6 @@
-use std::{f32::consts::PI, fmt::Display, path::Path};
+use std::{collections::HashMap, f32::consts::PI, fmt::Display, path::Path};
 
-use egui::{emath, pos2, Color32, Rect};
+use egui::{emath, pos2, Color32, Rect, Stroke};
 use rfd::FileDialog;
 
 use crate::{md_icons, setup_custom_fonts, setup_custom_styles};
@@ -32,6 +32,10 @@ pub struct OptiWayApp {
     selected_floor_index: usize,
     textures: Vec<Option<egui::TextureHandle>>,
     inactive_brightness: u8,
+    projection_coords: HashMap<String, [i32; 3]>,
+    active_path_color: Color32,
+    inactive_path_color: Color32,
+    show_path_window: bool,
 }
 
 impl Default for OptiWayApp {
@@ -47,6 +51,15 @@ impl Default for OptiWayApp {
             selected_floor_index: 0,
             textures: vec![None; 9],
             inactive_brightness: 64,
+            projection_coords: serde_yaml::from_str(
+                std::fs::read_to_string("../assets/projection-coords-flatten.yaml")
+                    .expect("Failed to read projection-coords-flatten.yaml")
+                    .as_str(),
+            )
+            .unwrap(),
+            active_path_color: Color32::from_rgb(0xec, 0x6f, 0x27),
+            inactive_path_color: Color32::from_gray(0x61),
+            show_path_window: false,
         }
     }
 }
@@ -160,7 +173,7 @@ impl eframe::App for OptiWayApp {
                         todo!();
                     }
                     if ui.button("Show path as text").clicked() {
-                        todo!();
+                        self.show_path_window = true;
                     }
                     ui.separator();
                     ui.heading("Floor view");
@@ -198,11 +211,70 @@ impl eframe::App for OptiWayApp {
                         egui::Slider::new(&mut self.inactive_brightness, 32..=255)
                             .text("Inactive floor brightness"),
                     );
+                    ui.collapsing("Path color", |ui| {
+                        ui.horizontal(|ui| {
+                            ui.vertical(|ui| {
+                                ui.label("Active path color");
+                                if ui.button("Reset").clicked() {
+                                    self.active_path_color = Color32::from_rgb(0xec, 0x6f, 0x27);
+                                }
+                            });
+                            egui::color_picker::color_picker_color32(
+                                ui,
+                                &mut self.active_path_color,
+                                egui::color_picker::Alpha::Opaque,
+                            );
+                        });
+                        ui.separator();
+
+                        ui.horizontal(|ui| {
+                            ui.vertical(|ui| {
+                                ui.label("Inactive path color");
+                                if ui.button("Reset").clicked() {
+                                    self.inactive_path_color = Color32::from_gray(0x61);
+                                }
+                            });
+                            egui::color_picker::color_picker_color32(
+                                ui,
+                                &mut self.inactive_path_color,
+                                egui::color_picker::Alpha::Opaque,
+                            );
+                        });
+                    });
                 });
             });
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
+            // Paths
+
+            let path_list: Vec<&str> = vec![
+                "A201", "S2-3", "S5-2", "X5A1", "X5B1", "S5-10", "S7-7", "B718",
+            ];
+
+            let mut segments: Vec<&[i32; 3]> = vec![];
+
+            for i in &path_list {
+                segments.push(&self.projection_coords[*i]);
+            }
+
+            // Paths window
+            if self.show_path_window {
+                egui::Window::new("Path")
+                    .open(&mut self.show_path_window)
+                    .show(ctx, |ui| {
+                        let mut path_string = String::new();
+                        for i in &path_list {
+                            path_string.push_str(i);
+                            path_string.push_str(" → ");
+                        }
+                        path_string.pop();
+                        path_string.pop();
+                        path_string.pop();
+                        ui.label(path_string);
+                    });
+            }
+
             // Import textures if uninitialized
 
             let mut textures: Vec<egui::TextureHandle> = Vec::new();
@@ -234,6 +306,54 @@ impl eframe::App for OptiWayApp {
             let mut bottom_right_x = 0.0;
 
             // Paint floor projections
+
+            let current_floor_z = if self.selected_floor_index == 0 {
+                0
+            } else {
+                ((self.selected_floor_index - 2) * 50) as i32
+            };
+            for (i, point) in segments.iter().enumerate() {
+                if i != 0 {
+                    ui.painter().circle_filled(
+                        convert_pos(&rect, point, scale),
+                        4.0,
+                        if self.selected_floor_index == 0
+                            || (current_floor_z >= point[2].min(segments[i - 1][2])
+                                && current_floor_z <= point[2].max(segments[i - 1][2]))
+                        {
+                            self.active_path_color
+                        } else {
+                            self.inactive_path_color
+                        },
+                    );
+                    ui.painter().line_segment(
+                        [
+                            convert_pos(&rect, segments[i - 1], scale),
+                            convert_pos(&rect, point, scale),
+                        ],
+                        if self.selected_floor_index == 0
+                            || (current_floor_z >= point[2].min(segments[i - 1][2])
+                                && current_floor_z <= point[2].max(segments[i - 1][2]))
+                        {
+                            Stroke::new(4.0, self.active_path_color)
+                        } else {
+                            Stroke::new(4.0, self.inactive_path_color)
+                        },
+                    );
+                } else {
+                    ui.painter().circle_filled(
+                        convert_pos(&rect, point, scale),
+                        4.0,
+                        if self.selected_floor_index == 0
+                            || (current_floor_z == point[2].min(segments[i][2]))
+                        {
+                            self.active_path_color
+                        } else {
+                            self.inactive_path_color
+                        },
+                    );
+                }
+            }
 
             for (i, texture) in textures.iter().enumerate().take(7) {
                 let rect = Rect::from_min_size(
@@ -276,12 +396,6 @@ impl eframe::App for OptiWayApp {
                     Color32::WHITE,
                 );
             }
-
-            ui.painter().circle_filled(
-                get_projection_pos(&rect, 1325, 200, 250, scale),
-                3.0,
-                Color32::RED,
-            );
         });
     }
 }
@@ -298,7 +412,7 @@ fn load_image_from_path(path: &std::path::Path) -> Result<egui::ColorImage, imag
 }
 
 /// Converts 3D coordinates in projection-coords.yaml to 2D coordinates on screen.
-fn get_projection_pos(rect: &Rect, x: i32, y: i32, z: i32, scale: f32) -> emath::Pos2 {
+fn convert_pos(rect: &Rect, pos: &[i32; 3], scale: f32) -> emath::Pos2 {
     /// Projection angle of the floor plan (radians)
     const ANGLE: f32 = PI / 6.0;
 
@@ -306,8 +420,8 @@ fn get_projection_pos(rect: &Rect, x: i32, y: i32, z: i32, scale: f32) -> emath:
         rect.left() + 25.0 * ANGLE.cos() * scale,
         rect.top() + (50.0 + 350.0 + 25.0 * ANGLE.sin()) * scale,
     ) + emath::vec2(
-        ((x as f32) * ANGLE.cos() + (y as f32) * ANGLE.cos()) * scale,
-        ((x as f32) * ANGLE.sin() - (y as f32) * ANGLE.sin() - (z as f32)) * scale,
+        ((pos[0] as f32) * ANGLE.cos() + (pos[1] as f32) * ANGLE.cos()) * scale,
+        ((pos[0] as f32) * ANGLE.sin() - (pos[1] as f32) * ANGLE.sin() - (pos[2] as f32)) * scale,
     ))
     .to_pos2()
 }
