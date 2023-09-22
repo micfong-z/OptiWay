@@ -548,6 +548,12 @@ class TimetableGenerator:
         return timetable
 
     def add_pshe(self):
+        """
+        Add PSHE session for each student.
+        For G1s and G2s, this lesson is added at P5 on everyday to immitate the 1-period classes.
+        """
+        g1_offset = 23000
+        g2_offset = 22000
         student_list = list(self.time_table.keys())
         offset = 0
         flag = True
@@ -557,7 +563,11 @@ class TimetableGenerator:
                     if i >= len(student_list):
                         flag = False
                         break
-                    self.time_table[student_list[i]]['3']['5'] = self.map_building(room) + str(room)
+                    if int(student_list[i]) // 1000 == g1_offset // 1000 or int(student_list[i]) // 1000 == g2_offset // 1000:
+                        for day in range(1, 6):
+                            self.time_table[student_list[i]][str(day)]['5'] = self.map_building(room) + str(room)
+                    else:
+                        self.time_table[student_list[i]]['3']['5'] = self.map_building(room) + str(room)
                 if not flag:
                     break
                 offset += 25
@@ -576,3 +586,5 @@ if __name__ == "__main__":
     time_table3 = generator.generate_as_al_level()
     generator.add_pshe()
 
+    with open("timetable_with_p5_4.json", "w") as file:
+        json.dump(generator.time_table, file)
