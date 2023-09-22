@@ -178,7 +178,10 @@ impl eframe::App for OptiWayApp {
                     ComboBox::from_label("Student")
                         .selected_text(self.selected_student.clone().unwrap_or("—".to_owned()))
                         .show_ui(ui, |ui| {
-                            ui.add(egui::TextEdit::singleline(&mut self.student_number_search).hint_text("Search"));
+                            ui.add(
+                                egui::TextEdit::singleline(&mut self.student_number_search)
+                                    .hint_text("Search"),
+                            );
                             ui.separator();
                             for student in self.student_list.lock().unwrap().iter() {
                                 if student.contains(&self.student_number_search) {
@@ -194,14 +197,22 @@ impl eframe::App for OptiWayApp {
                         .selected_text(convert_day_of_week(self.selected_day))
                         .show_ui(ui, |ui| {
                             for i in 1..=5 {
-                                ui.selectable_value(&mut self.selected_day, i, convert_day_of_week(i));
+                                ui.selectable_value(
+                                    &mut self.selected_day,
+                                    i,
+                                    convert_day_of_week(i),
+                                );
                             }
                         });
                     ComboBox::from_label("Period")
                         .selected_text(convert_periods(self.selected_period))
                         .show_ui(ui, |ui| {
                             for i in 1..=12 {
-                                ui.selectable_value(&mut self.selected_period, i, convert_periods(i));
+                                ui.selectable_value(
+                                    &mut self.selected_period,
+                                    i,
+                                    convert_periods(i),
+                                );
                             }
                         });
                     ui.separator();
@@ -327,7 +338,7 @@ impl eframe::App for OptiWayApp {
                                     .timetable_file_info
                                     .validation_status
                                     .clone().lock().unwrap() =
-                                        TimetableValidationStatus::Validating(0, "Ready to validate".to_owned());
+                                    TimetableValidationStatus::Validating(0, "Ready to validate".to_owned());
                                 let filepath = self.timetable_file_info.filepath.clone();
                                 let projection_coords = self.projection_coords.clone();
                                 let validation_status_arc = self
@@ -346,30 +357,30 @@ impl eframe::App for OptiWayApp {
                                 thread::spawn(move || {
                                     let mut rooms: Vec<String> = projection_coords.keys().map(|k| k.to_owned()).collect();
                                     *validation_status_arc.lock().unwrap() =
-                                    TimetableValidationStatus::Validating(0, "Validating student numbers...".to_owned());
+                                        TimetableValidationStatus::Validating(0, "Validating student numbers...".to_owned());
                                     rooms.push("G".into());
                                     let mut timetable_file = std::fs::File::open(filepath).unwrap();
                                     let mut timetable_json = String::new();
                                     if timetable_file
                                         .read_to_string(&mut timetable_json).is_err() {
-                                            *validation_status_arc.lock().unwrap() =
-                                                TimetableValidationStatus::Failed(
-                                                    "Failed to read timetable file"
-                                                        .to_owned(),
-                                                );
-                                            return;
-                                        };
-                                    let timetable: serde_json::Value =
-                                    match serde_json::from_str(&timetable_json) {
-                                        Ok(t) => t,
-                                        Err(e) => {
-                                            *validation_status_arc.lock().unwrap() =
-                                                TimetableValidationStatus::Failed(
-                                                    format!("Invalid JSON format in timetable file: {}", e)
-                                                );
-                                            return;
-                                        }
+                                        *validation_status_arc.lock().unwrap() =
+                                            TimetableValidationStatus::Failed(
+                                                "Failed to read timetable file"
+                                                    .to_owned(),
+                                            );
+                                        return;
                                     };
+                                    let timetable: serde_json::Value =
+                                        match serde_json::from_str(&timetable_json) {
+                                            Ok(t) => t,
+                                            Err(e) => {
+                                                *validation_status_arc.lock().unwrap() =
+                                                    TimetableValidationStatus::Failed(
+                                                        format!("Invalid JSON format in timetable file: {}", e)
+                                                    );
+                                                return;
+                                            }
+                                        };
                                     let mut student_count = 0;
 
                                     if timetable.as_object().is_none() {
@@ -381,7 +392,7 @@ impl eframe::App for OptiWayApp {
                                         return;
                                     }
                                     for student_key in timetable.as_object().unwrap().keys() {
-                                        if student_key.chars().all(char::is_numeric) &&  4 <= student_key.len() && student_key.len() <= 5 {
+                                        if student_key.chars().all(char::is_numeric) && 4 <= student_key.len() && student_key.len() <= 5 {
                                             student_count += 1;
                                             *student_count_arc.lock().unwrap() = Some(student_count);
                                         } else {
@@ -395,7 +406,7 @@ impl eframe::App for OptiWayApp {
                                             return;
                                         }
                                     }
-                                
+
                                     *validation_status_arc.lock().unwrap() =
                                         TimetableValidationStatus::Validating(10, "Validating days of the week...".to_owned());
                                     for (student_key, week_timetable) in timetable.as_object().unwrap() {
@@ -423,12 +434,10 @@ impl eframe::App for OptiWayApp {
                                         }
                                         if days_of_week.contains(&false) {
                                             *validation_status_arc.lock().unwrap() =
-                                                TimetableValidationStatus::Failed(
-                                                    format!(
-                                                        "Student {} has an incomplete timetable: missing day {}",
-                                                        student_key, days_of_week.iter().enumerate().filter(|(_, &b)| !b).map(|(i, _)| i + 1).collect::<Vec<usize>>().iter().map(|i| i.to_string()).collect::<Vec<String>>().join(", ")
-                                                    ),
-                                                );
+                                                TimetableValidationStatus::Failed(format!(
+                                                    "Student {} has an incomplete timetable: missing day {}",
+                                                    student_key, days_of_week.iter().enumerate().filter(|(_, &b)| !b).map(|(i, _)| i + 1).collect::<Vec<usize>>().iter().map(|i| i.to_string()).collect::<Vec<String>>().join(", ")
+                                                ), );
                                             return;
                                         }
                                     }
@@ -464,7 +473,8 @@ impl eframe::App for OptiWayApp {
                                                     TimetableValidationStatus::Failed(
                                                         format!(
                                                             "Student {} has an incomplete timetable on day {}: missing periods {}",
-                                                            student_key, day_key, periods.iter().enumerate().filter(|(_, &b)| !b).map(|(i, _)| i + 1).collect::<Vec<usize>>().iter().map(|i| i.to_string()).collect::<Vec<String>>().join(", ")
+                                                            student_key, day_key, periods.iter().
+                                                                enumerate().filter(|(_, &b)| !b).map(|(i, _)| i + 1).collect::<Vec<usize>>().iter().map(|i| i.to_string()).collect::<Vec<String>>().join(", ")
                                                         ),
                                                     );
                                                 return;
@@ -515,7 +525,7 @@ impl eframe::App for OptiWayApp {
                                         ui.add(ProgressBar::new(progress as f32 / 100.0));
                                     },
                                 );
-                            },
+                            }
                             TimetableValidationStatus::Failed(_) => {
                                 ui.with_layout(
                                     Layout::top_down_justified(egui::Align::Center),
@@ -539,8 +549,8 @@ impl eframe::App for OptiWayApp {
                                             RichText::new(
                                                 material_design_icons::MDI_CALENDAR_CHECK,
                                             )
-                                            .size(32.0)
-                                            .color(Color32::from_rgb(0x14, 0xae, 0x52)),
+                                                .size(32.0)
+                                                .color(Color32::from_rgb(0x14, 0xae, 0x52)),
                                         );
                                         ui.label("Validation successful");
                                         ui.label("The timetable has been imported successfully. You may now proceed to the next step.");
@@ -594,7 +604,7 @@ impl eframe::App for OptiWayApp {
                             format!("../assets/projection-transparent/projection_{i}F.png")
                                 .as_str(),
                         ))
-                        .unwrap(),
+                            .unwrap(),
                         Default::default(),
                     )
                 });
@@ -627,7 +637,7 @@ impl eframe::App for OptiWayApp {
                         4.0,
                         if self.selected_floor_index == 0
                             || (current_floor_z >= point[2].min(segments[i - 1][2])
-                                && current_floor_z <= point[2].max(segments[i - 1][2]))
+                            && current_floor_z <= point[2].max(segments[i - 1][2]))
                         {
                             self.active_path_color
                         } else {
@@ -641,7 +651,7 @@ impl eframe::App for OptiWayApp {
                         ],
                         if self.selected_floor_index == 0
                             || (current_floor_z >= point[2].min(segments[i - 1][2])
-                                && current_floor_z <= point[2].max(segments[i - 1][2]))
+                            && current_floor_z <= point[2].max(segments[i - 1][2]))
                         {
                             Stroke::new(4.0, self.active_path_color)
                         } else {
@@ -668,7 +678,7 @@ impl eframe::App for OptiWayApp {
                     rect.min,
                     emath::vec2(rect.width(), rect.width() / texture.aspect_ratio()),
                 )
-                .translate(emath::vec2(0.0, (7 - i) as f32 * 50.0 * scale));
+                    .translate(emath::vec2(0.0, (7 - i) as f32 * 50.0 * scale));
 
                 if bottom_right_x == 0.0 {
                     bottom_right_x = rect.max.x;
@@ -692,10 +702,10 @@ impl eframe::App for OptiWayApp {
                     rect.min,
                     emath::vec2(rect.width(), rect.width() / texture.aspect_ratio()),
                 )
-                .translate(emath::vec2(
-                    0.0,
-                    (7 - (self.selected_floor_index - 2)) as f32 * 50.0 * scale,
-                ));
+                    .translate(emath::vec2(
+                        0.0,
+                        (7 - (self.selected_floor_index - 2)) as f32 * 50.0 * scale,
+                    ));
 
                 ui.painter().image(
                     (&texture).into(),
@@ -708,7 +718,7 @@ impl eframe::App for OptiWayApp {
     }
 }
 
-fn load_image_from_path(path: &std::path::Path) -> Result<ColorImage, image::ImageError> {
+fn load_image_from_path(path: &Path) -> Result<ColorImage, image::ImageError> {
     let image = image::io::Reader::open(path)?.decode()?;
     let size = [image.width() as _, image.height() as _];
     let image_buffer = image.to_rgba8();
@@ -738,8 +748,9 @@ fn convert_day_of_week(day: u32) -> String {
         3 => "Wednesday",
         4 => "Thursday",
         5 => "Friday",
-        _ => "Unknown"
-    }.into()
+        _ => "Unknown",
+    }
+    .into()
 }
 
 fn convert_periods(index: usize) -> String {
@@ -756,6 +767,7 @@ fn convert_periods(index: usize) -> String {
         10 => "P8–P9",
         11 => "P9–P10",
         12 => "After P10",
-        _ => "Unknown"
-    }.into()
+        _ => "Unknown",
+    }
+    .into()
 }
