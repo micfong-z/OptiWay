@@ -162,10 +162,19 @@ json getRoutesfromTimetable(const json& timetables, const Graph& graph) {
                 if (period != 11) {
 
                     // If AS/AL students have P6s, the should go to G_floor in the end
-                     if (period == 6 && stoi(student) < 22000 && current_room != "G") {
+                     if (period == 6 && stoi(student) < 22000) {
+                        if (current_room == "G"){
+                            today["6"] = "";
+                            continue;
+                        }
                         vector<string> path = reconstructPath(pred, current_room, "G");
                         string path_str = concatenate(path);
                         today["6"] = path_str; 
+                        continue;
+                    }
+
+                    if (period == 6 && stoi(student) >= 22000) {
+                        today["6"] = "";
                         continue;
                     }
 
