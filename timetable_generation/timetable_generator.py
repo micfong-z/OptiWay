@@ -318,7 +318,7 @@ class TimetableGenerator:
             2: ["1_7_8", "3_1_2", "4_9_10"],
             3: ["1_9_10", "3_3_4", "5_1_2"],
             4: ["2_1_2", "3_7_8", "5_3_4"],
-            5: ["2_3_4", "4_1_2", "5_7_8"]
+            5: ["2_3_4", "4_1_2", "5_5_6"]
         }
         # Procedures #
         # 3 distribute timeslots for each course, each slot only needs 20 courses
@@ -547,7 +547,7 @@ class TimetableGenerator:
 
         return timetable
 
-    def add_pshe(self):
+    def add_pshe_gt(self):
         """
         Add PSHE session for each student.
         For G1s and G2s, this lesson is added at P5 on everyday to immitate the 1-period classes.
@@ -567,6 +567,15 @@ class TimetableGenerator:
                         for day in range(1, 6):
                             self.time_table[student_list[i]][str(day)]['5'] = self.map_building(room) + str(room)
                     else:
+                        gt_day = random.choice(["1", "2", "4", "5"])
+                        gt_floor = random.choice([6, 7, 8])
+                        gt_room = random.choice(list(self.avail_rooms[gt_floor]))
+                        if gt_day != "5":
+                            self.time_table[student_list[i]][gt_day]['5'] = self.map_building(gt_room) + str(gt_room)
+                            self.time_table[student_list[i]][gt_day]['6'] = self.map_building(gt_room) + str(gt_room)
+                        else:
+                            self.time_table[student_list[i]][gt_day]['7'] = self.map_building(gt_room) + str(gt_room)
+                            self.time_table[student_list[i]][gt_day]['8'] = self.map_building(gt_room) + str(gt_room)
                         self.time_table[student_list[i]]['3']['5'] = self.map_building(room) + str(room)
                 if not flag:
                     break
@@ -584,7 +593,7 @@ if __name__ == "__main__":
     time_table1 = generator.generate_g_level("G1")
     time_table2 = generator.generate_g_level("G2")
     time_table3 = generator.generate_as_al_level()
-    generator.add_pshe()
+    generator.add_pshe_gt()
 
-    with open("timetable_with_p5_4.json", "w") as file:
-        json.dump(generator.time_table, file)
+    with open("timetable_with_gt_0.json", "w") as file:
+        json.dump(generator.time_table, file, indent=4)
