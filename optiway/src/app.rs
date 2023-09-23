@@ -57,6 +57,7 @@ struct TimetableFileInfo {
     student_count: Arc<Mutex<Option<i32>>>,
     session_count: Arc<Mutex<Option<i32>>>,
     validation_status: Arc<Mutex<TimetableValidationStatus>>,
+    timetable: Arc<Mutex<Option<serde_json::Value>>>,
 }
 
 #[derive(Default, Clone, PartialEq, Eq)]
@@ -101,6 +102,7 @@ pub struct OptiWayApp {
     path_generation_status: Arc<Mutex<PathGenerationStatus>>,
     show_path_gen_window: bool,
     student_routes: Arc<Mutex<Option<Routes>>>,
+    show_timetable_window: bool,
 }
 
 impl Default for OptiWayApp {
@@ -111,7 +113,7 @@ impl Default for OptiWayApp {
             selected_student: Default::default(),
             student_list: Default::default(),
             selected_algorithm: Default::default(),
-            selected_period: 1,
+            selected_period: 0,
             selected_day: 1,
             selected_floor: floors,
             selected_floor_index: 0,
@@ -132,6 +134,7 @@ impl Default for OptiWayApp {
             path_generation_status: Default::default(),
             show_path_gen_window: false,
             student_routes: Default::default(),
+            show_timetable_window: false,
         }
     }
 }
@@ -277,6 +280,7 @@ impl OptiWayApp {
                     let validation_status_arc = self.timetable_file_info.validation_status.clone();
                     let student_count_arc = self.timetable_file_info.student_count.clone();
                     let session_count_arc = self.timetable_file_info.session_count.clone();
+                    let timetable_arc = self.timetable_file_info.timetable.clone();
                     let student_list_arc = self.student_list.clone();
                     thread::spawn(move || {
                         let mut rooms: Vec<String> = projection_coords.keys().map(|k| k.to_owned()).collect();
@@ -441,6 +445,7 @@ impl OptiWayApp {
                                 }
                             }
                         }
+                        *timetable_arc.lock().unwrap() = Some(timetable.clone());
 
                         *student_list_arc.lock().unwrap() =
                             timetable.as_object().unwrap().keys().map(|k| k.to_owned()).collect();
@@ -483,6 +488,62 @@ impl OptiWayApp {
                         }
                     });
                 }
+            }
+        });
+    }
+
+    fn show_timetable_window(&mut self, ctx: &egui::Context) {
+        Window::new("Timetable").show(ctx, |ui| {
+            if self
+                .timetable_file_info
+                .validation_status
+                .lock()
+                .unwrap()
+                .clone()
+                == TimetableValidationStatus::Successful
+            {
+                if let Some(student) = &self.selected_student {
+                    ui.label(format!("{}'s Timetable", student));
+                    egui::Grid::new("timetable_grid")
+                        .striped(true)
+                        .show(ui, |ui| {
+                            ui.label("Period");
+                            ui.label("Monday");
+                            ui.label("Tuesday");
+                            ui.label("Wednesday");
+                            ui.label("Thursday");
+                            ui.label("Friday");
+                            ui.end_row();
+
+                            let timetable = self.timetable_file_info.timetable.lock().unwrap();
+
+                            for period in 1..=10 {
+                                ui.label(format!("Period {}", period));
+                                for weekday in 1..=5 {
+                                    let mut session = timetable
+                                        .as_ref()
+                                        .unwrap()
+                                        .get(student)
+                                        .unwrap()
+                                        .get(weekday.to_string())
+                                        .unwrap()
+                                        .get(period.to_string())
+                                        .unwrap()
+                                        .as_str()
+                                        .unwrap();
+                                    if session == "G" {
+                                        session = " ";
+                                    }
+                                    ui.label(session);
+                                }
+                                ui.end_row();
+                            }
+                        });
+                } else {
+                    ui.label("No student selected.");
+                }
+            } else {
+                ui.label("Timetable not imported.");
             }
         });
     }
@@ -683,6 +744,9 @@ impl eframe::App for OptiWayApp {
                     if ui.button("Show path as text").clicked() {
                         self.show_path_window = true;
                     }
+                    if ui.button("Show timetable").clicked() {
+                        self.show_timetable_window = true;
+                    }
                     ui.separator();
                     ui.heading("Floor view");
                     ui.horizontal(|ui| {
@@ -760,6 +824,10 @@ impl eframe::App for OptiWayApp {
 
             if self.show_path_gen_window {
                 self.show_path_generation_window(ctx, current_path_status);
+            }
+
+            if self.show_timetable_window {
+                self.show_timetable_window(ctx);
             }
 
             // Paths
