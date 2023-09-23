@@ -74,8 +74,8 @@ void initializeDistanceAndPredecessorMatrices(const Graph& graph, DistanceMatrix
     }
 }
 
-string concatenate(const std::vector<std::string>& vec) {
-    std::string result;
+string concatenate(const vector<string>& vec) {
+    string result;
     for (const auto& str : vec) {
         if (!result.empty()) {
             result += " "; // Add space before appending, but not for the first string
@@ -134,34 +134,65 @@ json getRoutesfromTimetable(const json& timetables, const Graph& graph) {
         for (const auto& [day, classes] : timetable.items()) {
             json today;
             
+            // Start of the day, going from G_floor to the first class
             vector<string> path = reconstructPath(pred, "G", classes["1"]);
             string path_str = concatenate(path);
             today["0"] = path_str; 
 
-            for (int i = 1; i <= 10; i++) {  // 10 classes in a week, compulsory
-                const string& current_period = to_string(i);
+            // Lunch time is denoted by period "6", and periods after are delayed by one index
+            path = reconstructPath(pred, "G", classes["7"]);  // Originally, P7 is the first afternoon class
+            path_str = concatenate(path);
+            today["7"] = path_str; 
+
+            int offset = 0;
+            for (int period = 1; period <= 11; period++) {
+                // Skip P7 as it's already been handled
+                if (period == 7) {
+                    offset = 1;  // Add offset to be minused because P7 is now P6
+                    continue;
+                }
+
+                const string& current_period = to_string(period - offset);
                 const string& current_room = classes[current_period];
 
                 // cout << current_room << endl;
 
                 if (current_room[0] != 'A' && current_room[0] != 'B' && current_room[0] != 'G') continue; 
                 // If not the last class
-                if (i != 10) {
-                    const string& next_period = to_string(i + 1);
+                if (period != 11) {
+
+                    // If AS/AL students have P6s, the should go to G_floor in the end
+                     if (period == 6 && stoi(student) < 22000) {
+                        if (current_room == "G"){
+                            today["6"] = "";
+                            continue;
+                        }
+                        vector<string> path = reconstructPath(pred, current_room, "G");
+                        string path_str = concatenate(path);
+                        today["6"] = path_str; 
+                        continue;
+                    }
+
+                    if (period == 6 && stoi(student) >= 22000) {
+                        today["6"] = "";
+                        continue;
+                    }
+
+                    const string& next_period = to_string(period - offset + 1);
                     const string& next_room = classes[next_period];
 
                     if (next_room[0] != 'A' && next_room[0] != 'B' && next_room[0] != 'G') continue;
 
-                    if (next_room == current_room) today[current_period] = "";
+                    if (next_room == current_room) today[to_string(period)] = "";
                     else {
                         vector<string> path = reconstructPath(pred, current_room, next_room);
                         string path_str = concatenate(path);
-                        today[current_period] = path_str; 
+                        today[to_string(period)] = path_str; 
                     }
                 } else {
                         vector<string> path = reconstructPath(pred, current_room, "G");
                         string path_str = concatenate(path);
-                        today[current_period] = path_str; 
+                        today[to_string(period)] = path_str; 
                 }
             }
             week[day] = today;
@@ -195,13 +226,6 @@ int main() {
 
     Graph graph = createSchoolGraph("../assets/paths.txt");
     
-    /*
-    ofstream outFile("output.txt");
-    if (!outFile.is_open()) {
-        cerr << "Failed to open the output file." << endl;
-        return 1; // return with an error code
-    }
-    */
     json routes = getRoutesfromTimetable(timetables, graph);
 
     std::ofstream file("routes.json");
