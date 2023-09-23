@@ -179,7 +179,8 @@ int main() {
     cin.tie(0);
 
     // general input: the path to the time table json
-    cin >> timetable_path;  // "../assets/timetable_0.json"
+    // cin >> timetable_path;  // "../assets/timetable_0.json"
+    getline(cin, timetable_path);
 
     // parse the JSON file
     std::ifstream input_file(timetable_path);
