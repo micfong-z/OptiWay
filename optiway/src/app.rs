@@ -636,6 +636,11 @@ impl eframe::App for OptiWayApp {
                         .on_hover_text("No student selected.");
                     ui.separator();
                 }
+                if self.student_routes.lock().unwrap().is_none() {
+                    ui.label(material_design_icons::MDI_SIGN_DIRECTION_REMOVE)
+                        .on_hover_text("Path not calculated.");
+                    ui.separator();
+                }
                 ui.with_layout(Layout::right_to_left(egui::Align::Center), |ui| {
                     if self.show_json_validation {
                         ui.label("Validating timetable file");
@@ -725,7 +730,7 @@ impl eframe::App for OptiWayApp {
                     ComboBox::from_label("Period")
                         .selected_text(convert_periods(self.selected_period))
                         .show_ui(ui, |ui| {
-                            for i in 0..=10 {
+                            for i in 0..=11 {
                                 ui.selectable_value(
                                     &mut self.selected_period,
                                     i,
@@ -1037,11 +1042,12 @@ fn convert_periods(index: usize) -> String {
         3 => "P3–P4",
         4 => "P4–P5",
         5 => "P5–P6",
-        6 => "P6–P7",
-        7 => "P7–P8",
-        8 => "P8–P9",
-        9 => "P9–P10",
-        10 => "After P10",
+        6 => "P6–Lunch",
+        7 => "Lunch–P7",
+        8 => "P7–P8",
+        9 => "P8–P9",
+        10 => "P9–P10",
+        11 => "After P10",
         _ => "Unknown",
     }
     .into()
