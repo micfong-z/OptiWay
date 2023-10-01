@@ -2,3 +2,7 @@
 .VSCodeCounter
 .vscode
 optiway/target
+*.out
+multi_agent_path_finding/output
+**/routes.json
+.idea
