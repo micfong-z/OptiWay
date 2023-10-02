@@ -80,7 +80,18 @@ impl PathGenerationStatus {
     }
 }
 
+#[derive(Default, Clone, PartialEq, Eq)]
+enum CongestionStatus {
+    #[default]
+    Ready,
+    Generating(i32, String),
+    Failed(String),
+    Successful,
+}
+
 type Routes = HashMap<String, HashMap<u32, HashMap<usize, String>>>;
+type CongestionPoint = HashMap<u32, HashMap<usize, HashMap<String, u32>>>;
+type CongestionPath = HashMap<u32, HashMap<usize, HashMap<(String, String), u32>>>;
 
 pub struct OptiWayApp {
     selected_student: Option<String>,
@@ -103,6 +114,15 @@ pub struct OptiWayApp {
     show_path_gen_window: bool,
     student_routes: Arc<Mutex<Option<Routes>>>,
     show_timetable_window: bool,
+    show_congestion_window: bool,
+    congestion_status: Arc<Mutex<CongestionStatus>>,
+    congestion_point_data: Arc<Mutex<CongestionPoint>>,
+    congestion_path_data: Arc<Mutex<CongestionPath>>,
+    maximum_congestion: Arc<Mutex<u32>>,
+    show_congestion: bool,
+    congestion_filter: u32,
+    show_congestion_path: bool,
+    show_congestion_point: bool,
 }
 
 impl Default for OptiWayApp {
@@ -135,6 +155,39 @@ impl Default for OptiWayApp {
             show_path_gen_window: false,
             student_routes: Default::default(),
             show_timetable_window: false,
+            show_congestion_window: false,
+            congestion_status: Default::default(),
+            congestion_point_data: Arc::new(Mutex::new({
+                let mut congestion_data = CongestionPoint::new();
+                for day in 1..=5 {
+                    congestion_data.insert(day, HashMap::new());
+                    for period in 0..=11 {
+                        congestion_data
+                            .get_mut(&day)
+                            .unwrap()
+                            .insert(period, HashMap::new());
+                    }
+                }
+                congestion_data
+            })),
+            congestion_path_data: Arc::new(Mutex::new({
+                let mut congestion_data = CongestionPath::new();
+                for day in 1..=5 {
+                    congestion_data.insert(day, HashMap::new());
+                    for period in 0..=11 {
+                        congestion_data
+                            .get_mut(&day)
+                            .unwrap()
+                            .insert(period, HashMap::new());
+                    }
+                }
+                congestion_data
+            })),
+            maximum_congestion: Default::default(),
+            show_congestion: false,
+            congestion_filter: 0,
+            show_congestion_path: true,
+            show_congestion_point: true,
         }
     }
 }
@@ -238,6 +291,193 @@ impl OptiWayApp {
                         }
                     });
                 }
+            }
+        });
+    }
+
+    fn show_congestion_window(
+        &mut self,
+        ctx: &egui::Context,
+        current_congestion_status: CongestionStatus,
+    ) {
+        Window::new("Congestion Evaluation").show(ctx, |ui| {
+            match current_congestion_status {
+                CongestionStatus::Ready => {
+                    *self.maximum_congestion.lock().unwrap() = 0;
+                    *self.congestion_status.lock().unwrap() =
+                        CongestionStatus::Generating(0, "Evaluating congestion".to_owned());
+                    let congestion_point_data_arc = self.congestion_point_data.clone();
+                    let congestion_path_data_arc = self.congestion_path_data.clone();
+                    let congestion_status_arc = self.congestion_status.clone();
+                    let max_congestion_arc = self.maximum_congestion.clone();
+                    let mut rooms: Vec<String> = self.projection_coords.clone().keys().map(|k| k.to_owned()).collect();
+                    rooms.push("G".to_owned());
+                    let student_routes = self.student_routes.lock().unwrap().clone();
+                    if student_routes.is_none() {
+                        *congestion_status_arc.lock().unwrap() =
+                            CongestionStatus::Failed("No path data available".to_owned());
+                        return;
+                    }
+                    let student_routes = student_routes.unwrap();
+                    thread::spawn(move || {
+                        for day in 1..=5 {
+                            for period in 0..=11 {
+                                for room in &rooms {
+                                    congestion_point_data_arc
+                                        .lock()
+                                        .unwrap()
+                                        .get_mut(&day)
+                                        .unwrap()
+                                        .get_mut(&period)
+                                        .unwrap()
+                                        .insert(room.to_owned(), 0);
+                                }
+                            }
+                        }
+                        for student in &student_routes {
+                            for day in 1..=5 {
+                                for period in 0..=11 {
+                                    let rooms = student_routes
+                                        .get(student.0)
+                                        .unwrap()
+                                        .get(&day)
+                                        .unwrap()
+                                        .get(&period)
+                                        .unwrap()
+                                        .split(' ')
+                                        .collect::<Vec<&str>>();
+                                    let mut previous_room = "";
+                                    for room in rooms {
+                                        if room.is_empty() || room == "G" {
+                                            continue;
+                                        }
+                                        if !previous_room.is_empty() {
+                                            let contains = congestion_path_data_arc
+                                                .lock()
+                                                .unwrap()
+                                                .get(&day)
+                                                .unwrap()
+                                                .get(&period)
+                                                .unwrap()
+                                                .contains_key(&(previous_room.to_owned(), room.to_owned()));
+                                            if contains {
+                                                *congestion_path_data_arc
+                                                    .lock()
+                                                    .unwrap()
+                                                    .get_mut(&day)
+                                                    .unwrap()
+                                                    .get_mut(&period)
+                                                    .unwrap()
+                                                    .get_mut(&(previous_room.to_owned(), room.to_owned()))
+                                                    .unwrap() += 1;
+                                            } else {
+                                                congestion_path_data_arc
+                                                    .lock()
+                                                    .unwrap()
+                                                    .get_mut(&day)
+                                                    .unwrap()
+                                                    .get_mut(&period)
+                                                    .unwrap()
+                                                    .insert((previous_room.to_owned(), room.to_owned()), 1);
+                                            }
+                                            let contains = congestion_path_data_arc
+                                                .lock()
+                                                .unwrap()
+                                                .get(&day)
+                                                .unwrap()
+                                                .get(&period)
+                                                .unwrap()
+                                                .contains_key(&(room.to_owned(), previous_room.to_owned()));
+                                            if contains {
+                                                *congestion_path_data_arc
+                                                    .lock()
+                                                    .unwrap()
+                                                    .get_mut(&day)
+                                                    .unwrap()
+                                                    .get_mut(&period)
+                                                    .unwrap()
+                                                    .get_mut(&(room.to_owned(), previous_room.to_owned()))
+                                                    .unwrap() += 1;
+                                            } else {
+                                                congestion_path_data_arc
+                                                    .lock()
+                                                    .unwrap()
+                                                    .get_mut(&day)
+                                                    .unwrap()
+                                                    .get_mut(&period)
+                                                    .unwrap()
+                                                    .insert((room.to_owned(), previous_room.to_owned()), 1);
+                                            }
+                                        }
+                                        previous_room = room;
+                                        *congestion_point_data_arc
+                                            .lock()
+                                            .unwrap()
+                                            .get_mut(&day)
+                                            .unwrap()
+                                            .get_mut(&period)
+                                            .unwrap()
+                                            .get_mut(room)
+                                            .unwrap() += 1;
+                                        let cur_max_congestion = *max_congestion_arc.lock().unwrap();
+                                        *max_congestion_arc.lock().unwrap() = cur_max_congestion.max(
+                                            *congestion_point_data_arc
+                                                .lock()
+                                                .unwrap()
+                                                .get_mut(&day)
+                                                .unwrap()
+                                                .get_mut(&period)
+                                                .unwrap()
+                                                .get_mut(room)
+                                                .unwrap(),
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                        *congestion_status_arc.lock().unwrap() = CongestionStatus::Successful;
+                    });
+                }
+                CongestionStatus::Generating(_, message) => {
+                    ui.with_layout(Layout::top_down_justified(egui::Align::Center), |ui| {
+                        ui.label(
+                            RichText::new(material_design_icons::MDI_TRAFFIC_LIGHT).size(32.0),
+                        );
+                        ui.label(message);
+                        ui.spinner();
+                    });
+                }
+                CongestionStatus::Failed(message) => {
+                    ui.with_layout(Layout::top_down_justified(egui::Align::Center), |ui| {
+                        ui.label(
+                            RichText::new(material_design_icons::MDI_TRAFFIC_LIGHT)
+                                .size(32.0)
+                                .color(Color32::from_rgb(0xe4, 0x37, 0x48)),
+                        );
+                        ui.label("Congestion evaluation failed");
+                        ui.label(message);
+                        if ui.button("Close").clicked() {
+                            self.show_congestion_window = false;
+                        }
+                    });
+                }
+                CongestionStatus::Successful => {
+                    ui.with_layout(Layout::top_down_justified(egui::Align::Center), |ui| {
+                        ui.label(
+                            RichText::new(material_design_icons::MDI_TRAFFIC_LIGHT)
+                                .size(32.0)
+                                .color(Color32::from_rgb(0x14, 0xae, 0x52)),
+                        );
+                        ui.label("Congestion evaluation successful");
+                        ui.label(
+                            "The congestion has been successfully evaluated and loaded. You may now view them on the projection.",
+                        );
+                        ui.label(format!("Maximum congestion: {}", self.maximum_congestion.lock().unwrap()));
+                        if ui.button("Close").clicked() {
+                            self.show_congestion_window = false;
+                        }
+                    });
+                },
             }
         });
     }
@@ -621,6 +861,7 @@ impl eframe::App for OptiWayApp {
             .lock()
             .unwrap()
             .clone();
+        let current_congestion_status = self.congestion_status.lock().unwrap().clone();
         let current_path_status = self.path_generation_status.lock().unwrap().clone();
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
@@ -634,6 +875,16 @@ impl eframe::App for OptiWayApp {
                 if self.selected_student.is_none() {
                     ui.label(material_design_icons::MDI_ACCOUNT_ALERT)
                         .on_hover_text("No student selected.");
+                    ui.separator();
+                }
+                if self.student_routes.lock().unwrap().is_none() {
+                    ui.label(material_design_icons::MDI_SIGN_DIRECTION_REMOVE)
+                        .on_hover_text("Path not calculated.");
+                    ui.separator();
+                }
+                if current_congestion_status != CongestionStatus::Successful {
+                    ui.label(material_design_icons::MDI_VECTOR_POLYLINE_REMOVE)
+                        .on_hover_text("Congestion not calculated.");
                     ui.separator();
                 }
                 ui.with_layout(Layout::right_to_left(egui::Align::Center), |ui| {
@@ -692,6 +943,19 @@ impl eframe::App for OptiWayApp {
                             }
                         },
                     );
+                    ui.add_enabled_ui(
+                        current_path_status == PathGenerationStatus::Successful,
+                        |ui| {
+                            if ui
+                                .button("Calculate congestion")
+                                .on_disabled_hover_text("Caculate routes first.")
+                                .clicked()
+                            {
+                                self.show_congestion_window = true;
+                                *self.congestion_status.lock().unwrap() = CongestionStatus::Ready;
+                            }
+                        },
+                    );
                     ui.separator();
                     ComboBox::from_label("Student")
                         .selected_text(self.selected_student.clone().unwrap_or("—".to_owned()))
@@ -725,7 +989,7 @@ impl eframe::App for OptiWayApp {
                     ComboBox::from_label("Period")
                         .selected_text(convert_periods(self.selected_period))
                         .show_ui(ui, |ui| {
-                            for i in 0..=10 {
+                            for i in 0..=11 {
                                 ui.selectable_value(
                                     &mut self.selected_period,
                                     i,
@@ -783,36 +1047,92 @@ impl eframe::App for OptiWayApp {
                         Slider::new(&mut self.inactive_brightness, 32..=255)
                             .text("Inactive floor brightness"),
                     );
-                    ui.collapsing("Path color", |ui| {
-                        ui.horizontal(|ui| {
-                            ui.vertical(|ui| {
-                                ui.label("Active path color");
-                                if ui.button("Reset").clicked() {
-                                    self.active_path_color = Color32::from_rgb(0xec, 0x6f, 0x27);
+                    ui.separator();
+                    ui.horizontal(|ui| {
+                        if ui
+                            .selectable_label(!self.show_congestion, "Show paths")
+                            .clicked()
+                        {
+                            self.show_congestion = false;
+                        }
+                        ui.add_enabled_ui(
+                            *self.congestion_status.lock().unwrap() == CongestionStatus::Successful,
+                            |ui| {
+                                if ui
+                                    .selectable_label(self.show_congestion, "Show congestion")
+                                    .clicked()
+                                {
+                                    self.show_congestion = true;
                                 }
-                            });
-                            color_picker::color_picker_color32(
-                                ui,
-                                &mut self.active_path_color,
-                                color_picker::Alpha::Opaque,
-                            );
-                        });
-                        ui.separator();
-
-                        ui.horizontal(|ui| {
-                            ui.vertical(|ui| {
-                                ui.label("Inactive path color");
-                                if ui.button("Reset").clicked() {
-                                    self.inactive_path_color = Color32::from_gray(0x61);
-                                }
-                            });
-                            color_picker::color_picker_color32(
-                                ui,
-                                &mut self.inactive_path_color,
-                                color_picker::Alpha::Opaque,
-                            );
-                        });
+                            },
+                        );
                     });
+                    if self.show_congestion {
+                        ui.checkbox(&mut self.show_congestion_path, "Show path congestion");
+                        ui.checkbox(&mut self.show_congestion_point, "Show node congestion");
+                        ui.heading("Legend");
+                        egui::Grid::new("congestion_legend")
+                            .num_columns(2)
+                            .show(ui, |ui| {
+                                ui.label(RichText::new("●").color(congestion_color_scale(0)));
+                                ui.label("No students");
+                                ui.end_row();
+                                ui.label(RichText::new("●").color(congestion_color_scale(1)));
+                                ui.label("1-20 students");
+                                ui.end_row();
+                                ui.label(RichText::new("●").color(congestion_color_scale(21)));
+                                ui.label("21–50 students");
+                                ui.end_row();
+                                ui.label(RichText::new("●").color(congestion_color_scale(51)));
+                                ui.label("51–100 students");
+                                ui.end_row();
+                                ui.label(RichText::new("●").color(congestion_color_scale(101)));
+                                ui.label("101–200 students");
+                                ui.end_row();
+                                ui.label(RichText::new("●").color(congestion_color_scale(201)));
+                                ui.label("201–400 students");
+                                ui.end_row();
+                                ui.label(RichText::new("●").color(congestion_color_scale(401)));
+                                ui.label("≥401 students");
+                                ui.end_row();
+                            });
+                        ui.add(
+                            Slider::new(&mut self.congestion_filter, 0..=400)
+                                .text("Minimum congestion"),
+                        );
+                    } else {
+                        ui.collapsing("Path color", |ui| {
+                            ui.horizontal(|ui| {
+                                ui.vertical(|ui| {
+                                    ui.label("Active path color");
+                                    if ui.button("Reset").clicked() {
+                                        self.active_path_color =
+                                            Color32::from_rgb(0xec, 0x6f, 0x27);
+                                    }
+                                });
+                                color_picker::color_picker_color32(
+                                    ui,
+                                    &mut self.active_path_color,
+                                    color_picker::Alpha::Opaque,
+                                );
+                            });
+                            ui.separator();
+
+                            ui.horizontal(|ui| {
+                                ui.vertical(|ui| {
+                                    ui.label("Inactive path color");
+                                    if ui.button("Reset").clicked() {
+                                        self.inactive_path_color = Color32::from_gray(0x61);
+                                    }
+                                });
+                                color_picker::color_picker_color32(
+                                    ui,
+                                    &mut self.inactive_path_color,
+                                    color_picker::Alpha::Opaque,
+                                );
+                            });
+                        });
+                    }
                 });
             });
         });
@@ -828,6 +1148,10 @@ impl eframe::App for OptiWayApp {
 
             if self.show_timetable_window {
                 self.show_timetable_window(ctx);
+            }
+
+            if self.show_congestion_window {
+                self.show_congestion_window(ctx, current_congestion_status);
             }
 
             // Paths
@@ -910,46 +1234,106 @@ impl eframe::App for OptiWayApp {
             } else {
                 ((self.selected_floor_index - 2) * 50) as i32
             };
-            for (i, point) in segments.iter().enumerate() {
-                if i != 0 {
-                    ui.painter().circle_filled(
-                        convert_pos(&rect, point, scale),
-                        4.0,
-                        if self.selected_floor_index == 0
-                            || (current_floor_z >= point[2].min(segments[i - 1][2])
-                                && current_floor_z <= point[2].max(segments[i - 1][2]))
-                        {
-                            self.active_path_color
-                        } else {
-                            self.inactive_path_color
-                        },
-                    );
-                    ui.painter().line_segment(
-                        [
-                            convert_pos(&rect, segments[i - 1], scale),
+
+            if !self.show_congestion {
+                for (i, point) in segments.iter().enumerate() {
+                    if i != 0 {
+                        ui.painter().circle_filled(
                             convert_pos(&rect, point, scale),
-                        ],
+                            4.0,
+                            if self.selected_floor_index == 0
+                                || (current_floor_z >= point[2].min(segments[i - 1][2])
+                                    && current_floor_z <= point[2].max(segments[i - 1][2]))
+                            {
+                                self.active_path_color
+                            } else {
+                                self.inactive_path_color
+                            },
+                        );
+                        ui.painter().line_segment(
+                            [
+                                convert_pos(&rect, segments[i - 1], scale),
+                                convert_pos(&rect, point, scale),
+                            ],
+                            if self.selected_floor_index == 0
+                                || (current_floor_z >= point[2].min(segments[i - 1][2])
+                                    && current_floor_z <= point[2].max(segments[i - 1][2]))
+                            {
+                                Stroke::new(4.0, self.active_path_color)
+                            } else {
+                                Stroke::new(4.0, self.inactive_path_color)
+                            },
+                        );
+                    } else {
+                        ui.painter().circle_filled(
+                            convert_pos(&rect, point, scale),
+                            4.0,
+                            if self.selected_floor_index == 0
+                                || (current_floor_z == point[2].min(segments[i][2]))
+                            {
+                                self.active_path_color
+                            } else {
+                                self.inactive_path_color
+                            },
+                        );
+                    }
+                }
+            } else {
+                if self.show_congestion_path {
+                    for ((node1, node2), congestion) in self
+                        .congestion_path_data
+                        .lock()
+                        .unwrap()
+                        .clone()
+                        .get(&self.selected_day)
+                        .unwrap()
+                        .get(&self.selected_period)
+                        .unwrap()
+                    {
+                        if node1 == "G" || node2 == "G" || congestion < &self.congestion_filter {
+                            continue;
+                        }
+                        let node1_pos = self.projection_coords[node1];
+                        let node2_pos = self.projection_coords[node2];
                         if self.selected_floor_index == 0
-                            || (current_floor_z >= point[2].min(segments[i - 1][2])
-                                && current_floor_z <= point[2].max(segments[i - 1][2]))
+                            || (current_floor_z >= node1_pos[2].min(node2_pos[2])
+                                && current_floor_z <= node1_pos[2].max(node2_pos[2]))
                         {
-                            Stroke::new(4.0, self.active_path_color)
-                        } else {
-                            Stroke::new(4.0, self.inactive_path_color)
-                        },
-                    );
-                } else {
-                    ui.painter().circle_filled(
-                        convert_pos(&rect, point, scale),
-                        4.0,
-                        if self.selected_floor_index == 0
-                            || (current_floor_z == point[2].min(segments[i][2]))
+                            ui.painter().line_segment(
+                                [
+                                    convert_pos(&rect, &node1_pos, scale),
+                                    convert_pos(&rect, &node2_pos, scale),
+                                ],
+                                Stroke::new(4.0, congestion_color_scale(*congestion)),
+                            );
+                        }
+                    }
+                }
+                if self.show_congestion_point {
+                    for (room, congestion) in self
+                        .congestion_point_data
+                        .lock()
+                        .unwrap()
+                        .clone()
+                        .get(&self.selected_day)
+                        .unwrap()
+                        .get(&self.selected_period)
+                        .unwrap()
+                    {
+                        if room == "G" || room.is_empty() {
+                            continue;
+                        }
+                        let coords = self.projection_coords.get(room).unwrap();
+                        if (self.selected_floor_index == 0 || (current_floor_z == coords[2]))
+                            && *congestion >= self.congestion_filter
                         {
-                            self.active_path_color
-                        } else {
-                            self.inactive_path_color
-                        },
-                    );
+                            ui.painter().circle_filled(
+                                convert_pos(&rect, coords, scale),
+                                4.0,
+                                congestion_color_scale(*congestion),
+                            );
+                        }
+                    }
                 }
             }
 
@@ -1037,12 +1421,24 @@ fn convert_periods(index: usize) -> String {
         3 => "P3–P4",
         4 => "P4–P5",
         5 => "P5–P6",
-        6 => "P6–P7",
-        7 => "P7–P8",
-        8 => "P8–P9",
-        9 => "P9–P10",
-        10 => "After P10",
+        6 => "P6–Lunch",
+        7 => "Lunch–P7",
+        8 => "P7–P8",
+        9 => "P8–P9",
+        10 => "P9–P10",
+        11 => "After P10",
         _ => "Unknown",
     }
     .into()
+}
+fn congestion_color_scale(congestion: u32) -> Color32 {
+    match congestion {
+        0 => Color32::from_rgb(0x61, 0x61, 0x61),
+        1..=20 => Color32::from_rgb(0x00, 0x7a, 0xf5),
+        21..=50 => Color32::from_rgb(0x14, 0xae, 0x52),
+        51..=100 => Color32::from_rgb(0xff, 0xc1, 0x07),
+        101..=200 => Color32::from_rgb(0xec, 0x6f, 0x27),
+        201..=400 => Color32::from_rgb(0xe4, 0x37, 0x48),
+        _ => Color32::from_rgb(0x91, 0x54, 0xff),
+    }
 }

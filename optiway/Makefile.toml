@@ -32,3 +32,9 @@ dependencies = [
     "floyd-build",
     "entry-build",
 ]
+
+[tasks.release]
+dependencies = [
+    "floyd-build",
+    "entry-release-run",
+]
