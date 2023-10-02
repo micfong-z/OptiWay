@@ -120,28 +120,21 @@ vector<string> reconstructPath(const PredecessorMatrix& pred, const string& star
 }
 
 
-json getRoutesfromTimetable(const json& timetables, const Graph& graph) {
+json getRoutesfromTimetable(const json& timetables, const Graph& graph, const json& shortest_paths) {
     /* Obtain the routes as a json file from the timetables's json*/
     json routes;
-    DistanceMatrix dist;
-    PredecessorMatrix pred;
-
-    initializeDistanceAndPredecessorMatrices(graph, dist, pred);
-    floydWarshall(graph, dist, pred);
 
     for (const auto& [student, timetable] : timetables.items()) {
         json week;
         for (const auto& [day, classes] : timetable.items()) {
             json today;
-            
+
             // Start of the day, going from G_floor to the first class
-            vector<string> path = reconstructPath(pred, "G", classes["1"]);
-            string path_str = concatenate(path);
+            string path_str = shortest_paths["G"+classes["1"].get<string>()];
             today["0"] = path_str; 
 
             // Lunch time is denoted by period "6", and periods after are delayed by one index
-            path = reconstructPath(pred, "G", classes["7"]);  // Originally, P7 is the first afternoon class
-            path_str = concatenate(path);
+            path_str = shortest_paths["G"+classes["7"].get<string>()];  // Originally, P7 is the first afternoon class
             today["7"] = path_str; 
 
             int offset = 0;
@@ -167,8 +160,7 @@ json getRoutesfromTimetable(const json& timetables, const Graph& graph) {
                             today["6"] = "";
                             continue;
                         }
-                        vector<string> path = reconstructPath(pred, current_room, "G");
-                        string path_str = concatenate(path);
+                        string path_str = shortest_paths[current_room+"G"];
                         today["6"] = path_str; 
                         continue;
                     }
@@ -185,13 +177,11 @@ json getRoutesfromTimetable(const json& timetables, const Graph& graph) {
 
                     if (next_room == current_room) today[to_string(period)] = "";
                     else {
-                        vector<string> path = reconstructPath(pred, current_room, next_room);
-                        string path_str = concatenate(path);
+                        string path_str = shortest_paths[current_room+next_room];
                         today[to_string(period)] = path_str; 
                     }
                 } else {
-                        vector<string> path = reconstructPath(pred, current_room, "G");
-                        string path_str = concatenate(path);
+                        string path_str = shortest_paths[current_room+"G"];
                         today[to_string(period)] = path_str; 
                 }
             }
@@ -201,6 +191,36 @@ json getRoutesfromTimetable(const json& timetables, const Graph& graph) {
     }
 
     return routes;
+}
+
+// pre-calculated all the shortest paths in advance to avoid run-time calculations
+void generate_all_paths(const Graph& graph) {
+    DistanceMatrix dist;
+    PredecessorMatrix pred;
+
+    initializeDistanceAndPredecessorMatrices(graph, dist, pred);
+    floydWarshall(graph, dist, pred);
+
+    json routes;
+    for (const auto [room1, _] : graph) {
+        for (const auto [room2, __] : graph) {
+            if (room1[0] != 'A' && room1[0] != 'B' && room1[0] != 'G') continue;
+            if (room2[0] != 'A' && room2[0] != 'B' && room2[0] != 'G') continue;
+            if (room1 == room2) continue;
+            vector<string> path = reconstructPath(pred, room1, room2);
+            string path_str = concatenate(path);
+            routes[room1+room2] = path_str;
+        }
+    }
+
+    std::ofstream file("shortest_paths.json");
+    if (file.is_open()) {
+        file << routes.dump(4); // 4 spaces for indentation
+        file.close();
+        std::cout << "JSON data written to routes.json successfully." << endl;
+    } else {
+        std::cerr << "Failed to open the file for writing." << endl;
+    }
 }
 
 int main() {
@@ -214,9 +234,9 @@ int main() {
     getline(cin, timetable_path);
 
     // parse the JSON file
-    std::ifstream input_file(timetable_path);
+    ifstream input_file(timetable_path);
     if (!input_file.is_open()) {
-        std::cerr << "Failed to open the file." << std::endl;
+        cerr << "Failed to open the timetable file." << endl;
         return 1;
     }
 
@@ -225,16 +245,27 @@ int main() {
     input_file.close();
 
     Graph graph = createSchoolGraph("../assets/paths.txt");
+    // generate_all_paths(graph);
     
-    json routes = getRoutesfromTimetable(timetables, graph);
+    ifstream paths_file("../assets/shortest_paths.json");
+    if (!paths_file.is_open()) {
+        cerr << "Failed to open shortest_paths.json" << endl;
+        return 1;
+    }
 
-    std::ofstream file("routes.json");
+    json shortest_paths;
+    paths_file >> shortest_paths;
+    paths_file.close();
+
+    json routes = getRoutesfromTimetable(timetables, graph, shortest_paths);
+
+    ofstream file("routes.json");
     if (file.is_open()) {
         file << routes.dump(4); // 4 spaces for indentation
         file.close();
-        std::cout << "JSON data written to routes.json successfully." << std::endl;
+        cout << "JSON data written to routes.json successfully." << endl;
     } else {
-        std::cerr << "Failed to open the file for writing." << std::endl;
+        cerr << "Failed to open the file for writing." << endl;
     }
     
     return 0;

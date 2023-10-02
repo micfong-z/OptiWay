@@ -1431,7 +1431,6 @@ fn convert_periods(index: usize) -> String {
     }
     .into()
 }
-
 fn congestion_color_scale(congestion: u32) -> Color32 {
     match congestion {
         0 => Color32::from_rgb(0x61, 0x61, 0x61),
