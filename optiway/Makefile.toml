@@ -3,7 +3,11 @@ G_PLUS_PLUS = "g++-13"
 
 [tasks.floyd-build]
 command = "${G_PLUS_PLUS}"
-args = ["../multi_agent_path_finding/floyd.cpp", "-o", "bin/floyd.out", "-std=c++17", "-O2"]
+args = ["../multi_agent_path_finding/floyd.cpp", "-o", "bin/floyd.out", "-std=c++17", "-O"]
+
+[tasks.floyd-release-build]
+command = "${G_PLUS_PLUS}"
+args = ["../multi_agent_path_finding/floyd.cpp", "-o", "bin/floyd.out", "-std=c++17", "-O3"]
 
 [tasks.entry-run]
 command = "cargo"
@@ -35,6 +39,6 @@ dependencies = [
 
 [tasks.release]
 dependencies = [
-    "floyd-build",
+    "floyd-release-build",
     "entry-release-run",
 ]

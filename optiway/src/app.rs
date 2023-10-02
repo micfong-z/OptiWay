@@ -93,6 +93,41 @@ type Routes = HashMap<String, HashMap<u32, HashMap<usize, String>>>;
 type CongestionPoint = HashMap<u32, HashMap<usize, HashMap<String, u32>>>;
 type CongestionPath = HashMap<u32, HashMap<usize, HashMap<(String, String), u32>>>;
 
+struct CongestionStatistics {
+    point_count: HashMap<u32, HashMap<usize, Vec<u32>>>,
+    path_count: HashMap<u32, HashMap<usize, Vec<u32>>>,
+}
+
+impl Default for CongestionStatistics {
+    fn default() -> Self {
+        Self {
+            point_count: {
+                let mut point_count = HashMap::new();
+                for day in 1..=5 {
+                    point_count.insert(day, HashMap::new());
+                    for period in 0..=11 {
+                        point_count
+                            .get_mut(&day)
+                            .unwrap()
+                            .insert(period, vec![0; 7]);
+                    }
+                }
+                point_count
+            },
+            path_count: {
+                let mut path_count = HashMap::new();
+                for day in 1..=5 {
+                    path_count.insert(day, HashMap::new());
+                    for period in 0..=11 {
+                        path_count.get_mut(&day).unwrap().insert(period, vec![0; 7]);
+                    }
+                }
+                path_count
+            },
+        }
+    }
+}
+
 pub struct OptiWayApp {
     selected_student: Option<String>,
     student_list: Arc<Mutex<Vec<String>>>,
@@ -119,10 +154,12 @@ pub struct OptiWayApp {
     congestion_point_data: Arc<Mutex<CongestionPoint>>,
     congestion_path_data: Arc<Mutex<CongestionPath>>,
     maximum_congestion: Arc<Mutex<u32>>,
+    congestion_statistics: Arc<Mutex<CongestionStatistics>>,
     show_congestion: bool,
     congestion_filter: u32,
     show_congestion_path: bool,
     show_congestion_point: bool,
+    show_statistics_window: bool,
 }
 
 impl Default for OptiWayApp {
@@ -183,11 +220,13 @@ impl Default for OptiWayApp {
                 }
                 congestion_data
             })),
+            congestion_statistics: Default::default(),
             maximum_congestion: Default::default(),
             show_congestion: false,
             congestion_filter: 0,
             show_congestion_path: true,
             show_congestion_point: true,
+            show_statistics_window: false,
         }
     }
 }
@@ -306,10 +345,38 @@ impl OptiWayApp {
                     *self.maximum_congestion.lock().unwrap() = 0;
                     *self.congestion_status.lock().unwrap() =
                         CongestionStatus::Generating(0, "Evaluating congestion".to_owned());
+                    *self.congestion_statistics.lock().unwrap() = Default::default();
+                    *self.congestion_point_data.lock().unwrap() = {
+                        let mut congestion_data = CongestionPoint::new();
+                        for day in 1..=5 {
+                            congestion_data.insert(day, HashMap::new());
+                            for period in 0..=11 {
+                                congestion_data
+                                    .get_mut(&day)
+                                    .unwrap()
+                                    .insert(period, HashMap::new());
+                            }
+                        }
+                        congestion_data
+                    };
+                    *self.congestion_path_data.lock().unwrap() = {
+                        let mut congestion_data = CongestionPath::new();
+                        for day in 1..=5 {
+                            congestion_data.insert(day, HashMap::new());
+                            for period in 0..=11 {
+                                congestion_data
+                                    .get_mut(&day)
+                                    .unwrap()
+                                    .insert(period, HashMap::new());
+                            }
+                        }
+                        congestion_data
+                    };
                     let congestion_point_data_arc = self.congestion_point_data.clone();
                     let congestion_path_data_arc = self.congestion_path_data.clone();
                     let congestion_status_arc = self.congestion_status.clone();
                     let max_congestion_arc = self.maximum_congestion.clone();
+                    let congestion_statistics_arc = self.congestion_statistics.clone();
                     let mut rooms: Vec<String> = self.projection_coords.clone().keys().map(|k| k.to_owned()).collect();
                     rooms.push("G".to_owned());
                     let student_routes = self.student_routes.lock().unwrap().clone();
@@ -433,6 +500,35 @@ impl OptiWayApp {
                                         );
                                     }
                                 }
+                            }
+                        }
+                        for day in 1..=5 {
+                            for period in 0..=11 {
+                                for room in &rooms {
+                                    let room_congestion = *congestion_point_data_arc
+                                        .lock()
+                                        .unwrap()
+                                        .get_mut(&day)
+                                        .unwrap()
+                                        .get_mut(&period)
+                                        .unwrap()
+                                        .get_mut(room)
+                                        .unwrap();
+                                    congestion_statistics_arc.lock().unwrap().point_count.get_mut(&day).unwrap().get_mut(&period).unwrap()[congestion_range_index(room_congestion)] += 1;
+                                }
+                            }
+                        }
+                        for day in 1..=5 {
+                            for period in 0..=11 {
+                                congestion_path_data_arc
+                                .lock()
+                                .unwrap()
+                                .get_mut(&day)
+                                .unwrap()
+                                .get_mut(&period)
+                                .unwrap().iter_mut().for_each(|(_, congestion)| {
+                                    congestion_statistics_arc.lock().unwrap().path_count.get_mut(&day).unwrap().get_mut(&period).unwrap()[congestion_range_index(*congestion)] += 1;
+                                });
                             }
                         }
                         *congestion_status_arc.lock().unwrap() = CongestionStatus::Successful;
@@ -787,6 +883,136 @@ impl OptiWayApp {
             }
         });
     }
+
+    fn show_statistics_window(&mut self, ctx: &egui::Context) {
+        egui::Window::new("Congestion Statistics")
+            .open(&mut self.show_statistics_window)
+            .show(ctx, |ui| {
+                ui.heading("Point congestion");
+                egui::Grid::new("congestion_stats_point")
+                    .num_columns(2)
+                    .show(ui, |ui| {
+                        let congestion_stats_point = self
+                            .congestion_statistics
+                            .lock()
+                            .unwrap()
+                            .point_count
+                            .get(&self.selected_day)
+                            .unwrap()
+                            .get(&self.selected_period)
+                            .unwrap()
+                            .clone();
+                        ui.label("Legend");
+                        ui.label("Count");
+                        ui.end_row();
+
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new("●").color(congestion_color_scale(0)));
+                            ui.label("No students");
+                        });
+                        ui.label(format!("{}", congestion_stats_point[0]));
+                        ui.end_row();
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new("●").color(congestion_color_scale(1)));
+                            ui.label("1-20 students");
+                        });
+                        ui.label(format!("{}", congestion_stats_point[1]));
+                        ui.end_row();
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new("●").color(congestion_color_scale(21)));
+                            ui.label("21–50 students");
+                        });
+                        ui.label(format!("{}", congestion_stats_point[2]));
+                        ui.end_row();
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new("●").color(congestion_color_scale(51)));
+                            ui.label("51–100 students");
+                        });
+                        ui.label(format!("{}", congestion_stats_point[3]));
+                        ui.end_row();
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new("●").color(congestion_color_scale(101)));
+                            ui.label("101–200 students");
+                        });
+                        ui.label(format!("{}", congestion_stats_point[4]));
+                        ui.end_row();
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new("●").color(congestion_color_scale(201)));
+                            ui.label("201–400 students");
+                        });
+                        ui.label(format!("{}", congestion_stats_point[5]));
+                        ui.end_row();
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new("●").color(congestion_color_scale(401)));
+                            ui.label("≥401 students");
+                        });
+                        ui.label(format!("{}", congestion_stats_point[6]));
+                        ui.end_row();
+                    });
+                ui.separator();
+
+                ui.heading("Path congestion");
+                egui::Grid::new("congestion_stats_path")
+                    .num_columns(2)
+                    .show(ui, |ui| {
+                        let congestion_stats_path = self
+                            .congestion_statistics
+                            .lock()
+                            .unwrap()
+                            .path_count
+                            .get(&self.selected_day)
+                            .unwrap()
+                            .get(&self.selected_period)
+                            .unwrap()
+                            .clone();
+                        ui.label("Legend");
+                        ui.label("Count");
+                        ui.end_row();
+                        // ui.horizontal(|ui| {
+                        //     ui.label(RichText::new("━").color(Color32::TRANSPARENT));
+                        //     ui.label("No students");
+                        // });
+                        // ui.label(format!("{}", congestion_stats_path[0]));
+                        // ui.end_row();
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new("━").color(congestion_color_scale(1)));
+                            ui.label("1-20 students");
+                        });
+                        ui.label(format!("{}", congestion_stats_path[1] / 2)); // Divide by 2 since the paths contain duplicant reversed pairs
+                        ui.end_row();
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new("━").color(congestion_color_scale(21)));
+                            ui.label("21–50 students");
+                        });
+                        ui.label(format!("{}", congestion_stats_path[2] / 2));
+                        ui.end_row();
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new("━").color(congestion_color_scale(51)));
+                            ui.label("51–100 students");
+                        });
+                        ui.label(format!("{}", congestion_stats_path[3] / 2));
+                        ui.end_row();
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new("━").color(congestion_color_scale(101)));
+                            ui.label("101–200 students");
+                        });
+                        ui.label(format!("{}", congestion_stats_path[4] / 2));
+                        ui.end_row();
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new("━").color(congestion_color_scale(201)));
+                            ui.label("201–400 students");
+                        });
+                        ui.label(format!("{}", congestion_stats_path[5] / 2));
+                        ui.end_row();
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new("━").color(congestion_color_scale(401)));
+                            ui.label("≥401 students");
+                        });
+                        ui.label(format!("{}", congestion_stats_path[6] / 2));
+                        ui.end_row();
+                    });
+            });
+    }
 }
 
 fn run_floyd_algorithm(
@@ -1055,17 +1281,12 @@ impl eframe::App for OptiWayApp {
                         {
                             self.show_congestion = false;
                         }
-                        ui.add_enabled_ui(
-                            *self.congestion_status.lock().unwrap() == CongestionStatus::Successful,
-                            |ui| {
-                                if ui
-                                    .selectable_label(self.show_congestion, "Show congestion")
-                                    .clicked()
-                                {
-                                    self.show_congestion = true;
-                                }
-                            },
-                        );
+                        if ui
+                            .selectable_label(self.show_congestion, "Show congestion")
+                            .clicked()
+                        {
+                            self.show_congestion = true;
+                        }
                     });
                     if self.show_congestion {
                         ui.checkbox(&mut self.show_congestion_path, "Show path congestion");
@@ -1100,6 +1321,9 @@ impl eframe::App for OptiWayApp {
                             Slider::new(&mut self.congestion_filter, 0..=400)
                                 .text("Minimum congestion"),
                         );
+                        if ui.button("Show statistics").clicked() {
+                            self.show_statistics_window = true;
+                        }
                     } else {
                         ui.collapsing("Path color", |ui| {
                             ui.horizontal(|ui| {
@@ -1152,6 +1376,10 @@ impl eframe::App for OptiWayApp {
 
             if self.show_congestion_window {
                 self.show_congestion_window(ctx, current_congestion_status);
+            }
+
+            if self.show_statistics_window {
+                self.show_statistics_window(ctx);
             }
 
             // Paths
@@ -1440,5 +1668,17 @@ fn congestion_color_scale(congestion: u32) -> Color32 {
         101..=200 => Color32::from_rgb(0xec, 0x6f, 0x27),
         201..=400 => Color32::from_rgb(0xe4, 0x37, 0x48),
         _ => Color32::from_rgb(0x91, 0x54, 0xff),
+    }
+}
+
+fn congestion_range_index(congestion: u32) -> usize {
+    match congestion {
+        0 => 0,
+        1..=20 => 1,
+        21..=50 => 2,
+        51..=100 => 3,
+        101..=200 => 4,
+        201..=400 => 5,
+        _ => 6,
     }
 }
