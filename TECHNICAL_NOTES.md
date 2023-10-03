@@ -62,3 +62,13 @@ $$
 where $x, y, z$ are coordinates in the YAML file, $s$ is the scale factor of the image, and $\boldsymbol{a}$ is the offset from the top left point on screen.
 
 The angle used is $\frac{\pi}{6}$ because the projection angle used is exactly $30°$.
+
+## Path Evaluation
+
+For each route $r$ for a student between two specific periods, we give the route a performance index $r_\mathrm{perf}$, where smaller performance index indicates better performance. Consider all the paths between nodes $p_i\ (i\in\{1, 2, 3, \dots, n\})$ in the route $r$, let the length of the path be $w_i$, and the number of students passing the path between the two periods (congestion) be $c_i$.
+
+The performance index for $r$ is:
+
+$$
+r_\mathrm{perf}=\sum^n_{i=1}\left[ w_i\cdot\left(2+\frac{e^{(c_i-300)/200}-e^{-(c_i-300)/200}}{e^{(c_i-300)/200}+e^{-(c_i-300)/200}}\right)\right]
+$$
