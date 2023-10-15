@@ -587,7 +587,7 @@ impl OptiWayApp {
             ui.heading("Metadata");
             Grid::new("timetable_validation_grid").num_columns(2).show(ui, |ui| {
                 ui.label("Filename");
-                ui.label(format!("{}", self.timetable_file_info.filename));
+                ui.label(self.timetable_file_info.filename.to_string());
                 ui.end_row();
 
                 ui.label("Student count");
