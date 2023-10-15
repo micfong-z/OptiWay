@@ -2,8 +2,8 @@ use std::{
     collections::HashMap,
     f32::consts::PI,
     fmt::Display,
-    fs,
-    io::{Read, Write},
+    fs::{self, File},
+    io::{BufRead, Read, Write},
     path::{Path, PathBuf},
     process::{Command, Stdio},
     sync::{Arc, Mutex},
@@ -14,6 +14,7 @@ use egui::{
     color_picker, emath, pos2, CentralPanel, Color32, ColorImage, ComboBox, Grid, Layout,
     ProgressBar, Rect, RichText, Slider, Stroke, TextureHandle, Window,
 };
+use num_format::{Locale, ToFormattedString};
 use rfd::FileDialog;
 
 use crate::{md_icons::material_design_icons, setup_custom_fonts, setup_custom_styles};
@@ -86,6 +87,7 @@ enum CongestionStatus {
     Ready,
     Generating(i32, String),
     Failed(String),
+    GeneratingPI(i32, String),
     Successful,
 }
 
@@ -159,7 +161,12 @@ pub struct OptiWayApp {
     congestion_filter: u32,
     show_congestion_path: bool,
     show_congestion_point: bool,
-    show_statistics_window: bool,
+    show_pi_window: bool,
+    shortest_paths_json: HashMap<String, String>,
+    show_pi_shortest: bool,
+    performance_indices_shortest: Arc<Mutex<HashMap<u32, HashMap<usize, u128>>>>,
+    performance_indices_optimized: Arc<Mutex<HashMap<u32, HashMap<usize, u128>>>>,
+    path_distances: Arc<Mutex<HashMap<String, HashMap<String, u32>>>>,
 }
 
 impl Default for OptiWayApp {
@@ -226,7 +233,61 @@ impl Default for OptiWayApp {
             congestion_filter: 0,
             show_congestion_path: true,
             show_congestion_point: true,
-            show_statistics_window: false,
+            show_pi_window: false,
+            shortest_paths_json: serde_json::from_reader::<_, HashMap<String, String>>(
+                File::open("./assets/shortest_paths.json").unwrap(),
+            )
+            .unwrap(),
+            performance_indices_shortest: {
+                let mut performance_indices = HashMap::new();
+                for day in 1..=5 {
+                    performance_indices.insert(day, HashMap::new());
+                    for period in 0..=11 {
+                        performance_indices.get_mut(&day).unwrap().insert(period, 0);
+                    }
+                }
+                Arc::new(Mutex::new(performance_indices))
+            },
+            performance_indices_optimized: {
+                let mut performance_indices = HashMap::new();
+                for day in 1..=5 {
+                    performance_indices.insert(day, HashMap::new());
+                    for period in 0..=11 {
+                        performance_indices.get_mut(&day).unwrap().insert(period, 0);
+                    }
+                }
+                Arc::new(Mutex::new(performance_indices))
+            },
+            show_pi_shortest: true,
+            path_distances: Arc::new(Mutex::new({
+                let mut path_distances = HashMap::new();
+                // read paths.txt in the format [room1] [room2] [distance] [(ignore)]
+                let paths_file = File::open("./assets/paths.txt").unwrap();
+                let paths_file = std::io::BufReader::new(paths_file);
+                for line in paths_file.lines() {
+                    let line = line.unwrap();
+                    let mut line = line.split(' ');
+                    let room1 = line.next().unwrap().to_owned();
+                    let room2 = line.next().unwrap().to_owned();
+                    let distance = line.next().unwrap().parse::<u32>().unwrap();
+                    // insert if not present
+                    if !path_distances.contains_key(&room1) {
+                        path_distances.insert(room1.clone(), HashMap::new());
+                    }
+                    path_distances
+                        .get_mut(&room1)
+                        .unwrap()
+                        .insert(room2.clone(), distance);
+                    if !path_distances.contains_key(&room2) {
+                        path_distances.insert(room2.clone(), HashMap::new());
+                    }
+                    path_distances
+                        .get_mut(&room2)
+                        .unwrap()
+                        .insert(room1, distance);
+                }
+                path_distances
+            })),
         }
     }
 }
@@ -279,7 +340,9 @@ impl OptiWayApp {
                     let filepath = self.timetable_file_info.filepath.clone();
                     let path_generation_status_arc = self.path_generation_status.clone();
                     let student_paths_arc = self.student_routes.clone();
-                    thread::spawn(move || run_floyd_algorithm(filepath, path_generation_status_arc, student_paths_arc));
+                    let shortest_paths_json = self.shortest_paths_json.clone();
+                    // thread::spawn(move || run_floyd_algorithm_cpp(filepath, path_generation_status_arc, student_paths_arc));
+                    thread::spawn(move || run_floyd_algorithm_rust(filepath, shortest_paths_json, path_generation_status_arc, student_paths_arc));
                 }
                 PathGenerationStatus::Generating(_progress, message) => {
                     ui.with_layout(Layout::top_down_justified(egui::Align::Center), |ui| {
@@ -377,7 +440,9 @@ impl OptiWayApp {
                     let congestion_status_arc = self.congestion_status.clone();
                     let max_congestion_arc = self.maximum_congestion.clone();
                     let congestion_statistics_arc = self.congestion_statistics.clone();
+                    let path_distances_arc = self.path_distances.clone();
                     let mut rooms: Vec<String> = self.projection_coords.clone().keys().map(|k| k.to_owned()).collect();
+                    let performance_indices_shortest_arc = self.performance_indices_shortest.clone();
                     rooms.push("G".to_owned());
                     let student_routes = self.student_routes.lock().unwrap().clone();
                     if student_routes.is_none() {
@@ -531,9 +596,69 @@ impl OptiWayApp {
                                 });
                             }
                         }
+                        *congestion_status_arc.lock().unwrap() = CongestionStatus::GeneratingPI(0, "Calculating performance indices".to_owned());
+                        let mut performance_indices_shortest = HashMap::new();
+                        let path_distances = path_distances_arc.lock().unwrap().clone();
+                        for day in 1..=5 {
+                            performance_indices_shortest.insert(day, HashMap::new());
+                            for period in 0..=11 {
+                                let mut index = 0f64;
+                                for student in &student_routes {
+                                    let rooms = student_routes
+                                        .get(student.0)
+                                        .unwrap()
+                                        .get(&day)
+                                        .unwrap()
+                                        .get(&period)
+                                        .unwrap()
+                                        .split(' ')
+                                        .collect::<Vec<&str>>();
+                                    let mut previous_room = "";
+                                    for room in rooms {
+                                        if room.is_empty() || room == "G" {
+                                            continue;
+                                        }
+                                        if !previous_room.is_empty() {
+                                            let path_distance = *path_distances
+                                                .get(previous_room)
+                                                .unwrap()
+                                                .get(room)
+                                                .unwrap_or_else(|| {
+                                                    println!("{:?}", path_distances
+                                                        .get(previous_room)
+                                                        .unwrap());
+                                                    panic!(
+                                                    "Path distance not found: {} -> {}",
+                                                    previous_room, room
+                                                )}) as f64;
+                                            let path_congestion = *congestion_path_data_arc
+                                                .lock()
+                                                .unwrap()
+                                                .get(&day)
+                                                .unwrap()
+                                                .get(&period)
+                                                .unwrap()
+                                                .get(&(previous_room.to_owned(), room.to_owned()))
+                                                .unwrap() as f64;
+                                            index += path_distance * (2.0 + ((path_congestion - 300.0) / 200.0).tanh());
+                                        }
+                                        previous_room = room;
+                                    }
+                                }
+                                performance_indices_shortest.get_mut(&day).unwrap().insert(period, index as u128);    
+                            }
+                        }
+                        *performance_indices_shortest_arc.lock().unwrap() = performance_indices_shortest;
                         *congestion_status_arc.lock().unwrap() = CongestionStatus::Successful;
                     });
                 }
+                CongestionStatus::GeneratingPI(_, message) => {
+                    ui.with_layout(Layout::top_down_justified(egui::Align::Center), |ui| {
+                        ui.label(RichText::new(material_design_icons::MDI_TIMER).size(32.0));
+                        ui.label(message);
+                        ui.spinner();
+                    });
+                },
                 CongestionStatus::Generating(_, message) => {
                     ui.with_layout(Layout::top_down_justified(egui::Align::Center), |ui| {
                         ui.label(
@@ -573,7 +698,7 @@ impl OptiWayApp {
                             self.show_congestion_window = false;
                         }
                     });
-                },
+                }
             }
         });
     }
@@ -884,138 +1009,80 @@ impl OptiWayApp {
         });
     }
 
-    fn show_statistics_window(&mut self, ctx: &egui::Context) {
-        egui::Window::new("Congestion Statistics")
-            .open(&mut self.show_statistics_window)
+    fn show_pi_window(&mut self, ctx: &egui::Context) {
+        egui::Window::new("Performance Indices")
+            .open(&mut self.show_pi_window)
             .show(ctx, |ui| {
-                ui.heading("Point congestion");
-                egui::Grid::new("congestion_stats_point")
-                    .num_columns(2)
-                    .show(ui, |ui| {
-                        let congestion_stats_point = self
-                            .congestion_statistics
-                            .lock()
-                            .unwrap()
-                            .point_count
-                            .get(&self.selected_day)
-                            .unwrap()
-                            .get(&self.selected_period)
-                            .unwrap()
-                            .clone();
-                        ui.label("Legend");
-                        ui.label("Count");
-                        ui.end_row();
+                let performance_indices_shortest =
+                    self.performance_indices_shortest.lock().unwrap();
+                ui.horizontal(|ui| {
+                    if ui
+                        .selectable_label(self.show_pi_shortest, "Shorest Path")
+                        .clicked()
+                    {
+                        self.show_pi_shortest = true;
+                    };
 
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new("●").color(congestion_color_scale(0)));
-                            ui.label("No students");
-                        });
-                        ui.label(format!("{}", congestion_stats_point[0]));
+                    if ui
+                        .selectable_label(!self.show_pi_shortest, "Optimized Path")
+                        .clicked()
+                    {
+                        self.show_pi_shortest = false;
+                    };
+                });
+                ui.separator();
+                ui.label("Performance Indices Overview");
+                Grid::new("shortest_pi_grid")
+                    .striped(true)
+                    .num_columns(6)
+                    .show(ui, |ui| {
+                        ui.label("");
+                        ui.label("Monday");
+                        ui.label("Tuesday");
+                        ui.label("Wednesday");
+                        ui.label("Thursday");
+                        ui.label("Friday");
                         ui.end_row();
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new("●").color(congestion_color_scale(1)));
-                            ui.label("1-20 students");
-                        });
-                        ui.label(format!("{}", congestion_stats_point[1]));
-                        ui.end_row();
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new("●").color(congestion_color_scale(21)));
-                            ui.label("21–50 students");
-                        });
-                        ui.label(format!("{}", congestion_stats_point[2]));
-                        ui.end_row();
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new("●").color(congestion_color_scale(51)));
-                            ui.label("51–100 students");
-                        });
-                        ui.label(format!("{}", congestion_stats_point[3]));
-                        ui.end_row();
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new("●").color(congestion_color_scale(101)));
-                            ui.label("101–200 students");
-                        });
-                        ui.label(format!("{}", congestion_stats_point[4]));
-                        ui.end_row();
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new("●").color(congestion_color_scale(201)));
-                            ui.label("201–400 students");
-                        });
-                        ui.label(format!("{}", congestion_stats_point[5]));
-                        ui.end_row();
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new("●").color(congestion_color_scale(401)));
-                            ui.label("≥401 students");
-                        });
-                        ui.label(format!("{}", congestion_stats_point[6]));
-                        ui.end_row();
+                        for index in 0..=11 {
+                            ui.label(convert_periods(index));
+                            for day in 1..=5 {
+                                ui.label(
+                                    performance_indices_shortest[&day][&index]
+                                        .to_formatted_string(&Locale::fr),
+                                );
+                            }
+                            ui.end_row();
+                        }
                     });
                 ui.separator();
-
-                ui.heading("Path congestion");
-                egui::Grid::new("congestion_stats_path")
-                    .num_columns(2)
-                    .show(ui, |ui| {
-                        let congestion_stats_path = self
-                            .congestion_statistics
-                            .lock()
-                            .unwrap()
-                            .path_count
-                            .get(&self.selected_day)
-                            .unwrap()
-                            .get(&self.selected_period)
-                            .unwrap()
-                            .clone();
-                        ui.label("Legend");
-                        ui.label("Count");
-                        ui.end_row();
-                        // ui.horizontal(|ui| {
-                        //     ui.label(RichText::new("━").color(Color32::TRANSPARENT));
-                        //     ui.label("No students");
-                        // });
-                        // ui.label(format!("{}", congestion_stats_path[0]));
-                        // ui.end_row();
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new("━").color(congestion_color_scale(1)));
-                            ui.label("1-20 students");
-                        });
-                        ui.label(format!("{}", congestion_stats_path[1] / 2)); // Divide by 2 since the paths contain duplicant reversed pairs
-                        ui.end_row();
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new("━").color(congestion_color_scale(21)));
-                            ui.label("21–50 students");
-                        });
-                        ui.label(format!("{}", congestion_stats_path[2] / 2));
-                        ui.end_row();
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new("━").color(congestion_color_scale(51)));
-                            ui.label("51–100 students");
-                        });
-                        ui.label(format!("{}", congestion_stats_path[3] / 2));
-                        ui.end_row();
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new("━").color(congestion_color_scale(101)));
-                            ui.label("101–200 students");
-                        });
-                        ui.label(format!("{}", congestion_stats_path[4] / 2));
-                        ui.end_row();
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new("━").color(congestion_color_scale(201)));
-                            ui.label("201–400 students");
-                        });
-                        ui.label(format!("{}", congestion_stats_path[5] / 2));
-                        ui.end_row();
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new("━").color(congestion_color_scale(401)));
-                            ui.label("≥401 students");
-                        });
-                        ui.label(format!("{}", congestion_stats_path[6] / 2));
-                        ui.end_row();
-                    });
+                ui.label("Current Period PI");
+                ui.heading(
+                    performance_indices_shortest[&self.selected_day][&self.selected_period]
+                        .to_formatted_string(&Locale::fr),
+                );
+                ui.separator();
+                ui.label("Current Day PI");
+                ui.heading(
+                    performance_indices_shortest[&self.selected_day]
+                        .values()
+                        .sum::<u128>()
+                        .to_formatted_string(&Locale::fr),
+                );
+                ui.separator();
+                ui.label("Total PI");
+                ui.heading(
+                    performance_indices_shortest
+                        .values()
+                        .map(|day| day.values().sum::<u128>())
+                        .sum::<u128>()
+                        .to_formatted_string(&Locale::fr),
+                );
             });
     }
 }
 
-fn run_floyd_algorithm(
+#[allow(dead_code)]
+fn run_floyd_algorithm_cpp(
     filepath: PathBuf,
     path_generation_status_arc: Arc<Mutex<PathGenerationStatus>>,
     student_paths_arc: Arc<Mutex<Option<Routes>>>,
@@ -1073,6 +1140,152 @@ fn run_floyd_algorithm(
         *path_generation_status_arc.lock().unwrap() =
             PathGenerationStatus::Failed("Failed to find timetable file.".to_owned());
     }
+}
+
+fn run_floyd_algorithm_rust(
+    filepath: PathBuf,
+    shortest_paths_json: HashMap<String, String>,
+    path_generation_status_arc: Arc<Mutex<PathGenerationStatus>>,
+    student_paths_arc: Arc<Mutex<Option<Routes>>>,
+) {
+    type Timetable = HashMap<String, HashMap<u32, HashMap<usize, String>>>;
+    let mut result: Routes = HashMap::new();
+    let Ok(timetable_file) = File::open(filepath) else {
+        *path_generation_status_arc.lock().unwrap() =
+            PathGenerationStatus::Failed("Failed to find timetable file.".to_owned());
+        return;
+    };
+    let Ok(timetable_json) = serde_json::from_reader::<_, Timetable>(timetable_file) else {
+        *path_generation_status_arc.lock().unwrap() = PathGenerationStatus::Failed(
+            "Failed to parse timetable file. Please make sure the file is in JSON format."
+                .to_owned(),
+        );
+        return;
+    };
+    for student_number in timetable_json.keys() {
+        let mut student_hashmap: HashMap<u32, HashMap<usize, String>> = HashMap::new();
+        let mut student_timetable = timetable_json.get(student_number).unwrap().clone();
+        for day in 1..=5 {
+            let mut day_hashmap: HashMap<usize, String> = HashMap::new();
+            student_timetable.entry(day).or_insert_with(HashMap::new);
+            day_hashmap.insert(0, {
+                let first_room = student_timetable
+                    .get(&day)
+                    .unwrap()
+                    .get(&1)
+                    .unwrap()
+                    .to_owned();
+                if first_room == "G" {
+                    "".to_owned()
+                } else {
+                    shortest_paths_json
+                        .get(format!("G{}", first_room).as_str())
+                        .unwrap()
+                        .to_owned()
+                }
+            });
+            for period in 1..=5 {
+                day_hashmap.insert(period, {
+                    let room_a = student_timetable
+                        .get(&day)
+                        .unwrap()
+                        .get(&period)
+                        .unwrap()
+                        .to_owned();
+                    let room_b = student_timetable
+                        .get(&day)
+                        .unwrap()
+                        .get(&(period + 1))
+                        .unwrap()
+                        .to_owned();
+                    if room_a == room_b {
+                        "".to_owned()
+                    } else {
+                        shortest_paths_json
+                            .get(format!("{}{}", room_a, room_b).as_str())
+                            .unwrap()
+                            .to_owned()
+                    }
+                });
+            }
+            day_hashmap.insert(6, {
+                let first_room = student_timetable
+                    .get(&day)
+                    .unwrap()
+                    .get(&6)
+                    .unwrap()
+                    .to_owned();
+                if first_room == "G" {
+                    "".to_owned()
+                } else {
+                    shortest_paths_json
+                        .get(format!("{}G", first_room).as_str())
+                        .unwrap()
+                        .to_owned()
+                }
+            });
+            day_hashmap.insert(7, {
+                let first_room = student_timetable
+                    .get(&day)
+                    .unwrap()
+                    .get(&7)
+                    .unwrap()
+                    .to_owned();
+                if first_room == "G" {
+                    "".to_owned()
+                } else {
+                    shortest_paths_json
+                        .get(format!("G{}", first_room).as_str())
+                        .unwrap()
+                        .to_owned()
+                }
+            });
+            for period in 7..=9 {
+                day_hashmap.insert(period + 1, {
+                    let room_a = student_timetable
+                        .get(&day)
+                        .unwrap()
+                        .get(&period)
+                        .unwrap()
+                        .to_owned();
+                    let room_b = student_timetable
+                        .get(&day)
+                        .unwrap()
+                        .get(&(period + 1))
+                        .unwrap()
+                        .to_owned();
+                    if room_a == room_b {
+                        "".to_owned()
+                    } else {
+                        shortest_paths_json
+                            .get(format!("{}{}", room_a, room_b).as_str())
+                            .unwrap()
+                            .to_owned()
+                    }
+                });
+            }
+            day_hashmap.insert(11, {
+                let first_room = student_timetable
+                    .get(&day)
+                    .unwrap()
+                    .get(&10)
+                    .unwrap()
+                    .to_owned();
+                if first_room == "G" {
+                    "".to_owned()
+                } else {
+                    shortest_paths_json
+                        .get(format!("{}G", first_room).as_str())
+                        .unwrap()
+                        .to_owned()
+                }
+            });
+            student_hashmap.insert(day, day_hashmap);
+        }
+        result.insert(student_number.to_owned(), student_hashmap);
+    }
+    *student_paths_arc.lock().unwrap() = Some(result);
+    *path_generation_status_arc.lock().unwrap() = PathGenerationStatus::Successful;
 }
 
 impl eframe::App for OptiWayApp {
@@ -1321,8 +1534,8 @@ impl eframe::App for OptiWayApp {
                             Slider::new(&mut self.congestion_filter, 0..=400)
                                 .text("Minimum congestion"),
                         );
-                        if ui.button("Show statistics").clicked() {
-                            self.show_statistics_window = true;
+                        if ui.button("Show performance indices").clicked() {
+                            self.show_pi_window = true;
                         }
                     } else {
                         ui.collapsing("Path color", |ui| {
@@ -1378,8 +1591,8 @@ impl eframe::App for OptiWayApp {
                 self.show_congestion_window(ctx, current_congestion_status);
             }
 
-            if self.show_statistics_window {
-                self.show_statistics_window(ctx);
+            if self.show_pi_window {
+                self.show_pi_window(ctx);
             }
 
             // Paths
