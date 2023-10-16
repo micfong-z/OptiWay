@@ -6,6 +6,7 @@
 #include <cmath>
 #include <queue>
 #include <climits>
+#include <string>
 #include "json.hpp"
 using json = nlohmann::json;
 
@@ -33,9 +34,13 @@ struct CompareStudentPath {
 using Graph = unordered_map<string, vector<Edge>>;
 using PathPQ = priority_queue<StudentPath, vector<StudentPath>, CompareStudentPath>;
 
-const int BATCH_SIZE = 1;
+int BATCH_SIZE = 10;
 const double CONGESTION_PENALTY = 10000.0;
-const int NUM_ITER = 1000;
+int ITER_NUM = INT_MAX;
+int ITER_COUNT = 1;
+string ROUTE_FILE_PATH;
+int ITER_SAVE_STEPS = 500;
+
 
 // Code to create the school's layout graph from the path.txt
 Graph createSchoolGraph(const string& file_path) {
@@ -142,17 +147,20 @@ json getRoutesfromTimetable(const json& timetables, const Graph& graph, const js
 }
 
 // Code to slice a route string into a vector of strings
-vector<string> vectorizeString(const string& path) {
-     vector<string> path_vec;
-     size_t start = 0, end;
+vector<string> vectorizeString(const string s) {
+    vector<string> tokens;
+    int start = 0;
+    int end = s.find(' ');
 
-    while ((end = path.find(' ', start)) != string::npos) {
-        path_vec.push_back(path.substr(start, end - start));
+    while (end != string::npos) {
+        tokens.push_back(s.substr(start, end - start));
         start = end + 1;
+        end = s.find(' ', start);
     }
-    path_vec.push_back(path.substr(start));
 
-    return path_vec;
+    tokens.push_back(s.substr(start, end));
+
+    return tokens;
 }
 
 // Code to concatenate a vector of strings into a single string
@@ -173,6 +181,9 @@ vector<string> getDijkstraPenaltiedPath(const string& start, const string& end, 
     unordered_map<string, bool> visited;
     unordered_map<string, string> prev;  // to store the path
 
+    vector<string> path;
+    if (start == end) return path = {"G", "G"};
+
     for (const auto& [node, _] : graph) {
         distances[node] = INT_MAX;
         visited[node] = false;
@@ -188,19 +199,25 @@ vector<string> getDijkstraPenaltiedPath(const string& start, const string& end, 
 
         if (visited[current]) continue;
         visited[current] = true;
-
-        for (const auto& edge : graph.at(current)) {
-            double edgeWeight = edge.weight + (CONGESTION_PENALTY * congestion.at(current+edge.dest));
-            if (!visited[edge.dest] && distances[current] + edgeWeight < distances[edge.dest]) {
-                distances[edge.dest] = distances[current] + edgeWeight;
-                pq.push({-distances[edge.dest], edge.dest});
-                prev[edge.dest] = current;  // save the previous node for path reconstruction
+        
+        string destination;
+        try {
+            for (const auto& edge : graph.at(current)) {
+                destination = edge.dest;
+                double edgeWeight = edge.weight + (CONGESTION_PENALTY * congestion.at(current+edge.dest));
+                if (!visited[edge.dest] && distances[current] + edgeWeight < distances[edge.dest]) {
+                    distances[edge.dest] = distances[current] + edgeWeight;
+                    pq.push({-distances[edge.dest], edge.dest});
+                    prev[edge.dest] = current;  // save the previous node for path reconstruction
+                }
             }
+        } catch (const out_of_range& e) {
+            cout << current << endl;
+            cerr << "Error: " << e.what() << endl;
         }
     }
 
     // Reconstruct path from 'end' to 'start' using the 'prev' mapping
-    vector<string> path;
     for (string at = end; at != ""; at = prev[at]) {
         path.push_back(at);
     }
@@ -213,6 +230,8 @@ vector<string> getDijkstraPenaltiedPath(const string& start, const string& end, 
 double computePerformanceIndex(const vector<string>& route, const unordered_map<string, int>& congestion, const Graph& graph) {
     double r_perf = 0.0;
     int c = 0;
+
+    if (route[0] == "G" && route[1] == "G") return 0.0;  // spare class
 
     for (int i = 0; i < route.size() - 1; i++) {
         string start = route[i];
@@ -237,7 +256,7 @@ double computePerformanceIndex(const vector<string>& route, const unordered_map<
 }
 
 // Code for a single iteration of the code for a single period
-void iter(PathPQ& paths, double& sum_rperf, const unordered_map<string, int>& congestion, const Graph& graph, string& last_start, string& last_end, vector<StudentPath>& temp) {
+void iter(PathPQ& paths, double& sum_rperf, unordered_map<string, int>& congestion, const Graph& graph, string& last_start, string& last_end, vector<StudentPath>& temp) {
     // A single iteration
     StudentPath worst_path;
     bool flag = false;
@@ -259,19 +278,19 @@ void iter(PathPQ& paths, double& sum_rperf, const unordered_map<string, int>& co
     // cout << endl;
     // for (const auto v: new_route) cout << v << " ";
     double new_rperf = computePerformanceIndex(new_route, congestion, graph);
-    cout << worst_path.rperf << " " << new_rperf << endl;
+    // cout << worst_path.rperf << " " << new_rperf << endl;
     if (new_rperf < worst_path.rperf) {
         StudentPath new_path = {worst_path.id, new_rperf, new_route};
         paths.push(new_path);
         sum_rperf += new_rperf;
-        cout << "UPDATED PATH " << worst_path.id << endl;
+        // cout << "UPDATED PATH " << worst_path.id << endl;
     } else {
         // if the path doesn't change, the student's path cannot be further optimized as the congestion penalty is already too high
         temp.push_back(worst_path);
         sum_rperf += worst_path.rperf;
         last_start = worst_path.path[0], last_end = worst_path.path[worst_path.path.size()-1];
     }
-    // TODO： 论证last_start, last_end可能性，论证
+    // TODO： validate last_start and last_end
 }
 
 // Code for multiple iterations of the code for a single period
@@ -280,7 +299,7 @@ void iterMultiple(PathPQ& paths, double& sum_rperf, unordered_map<string, int>& 
     vector<StudentPath> temp;
     PathPQ paths_copy = paths;
     double sum_rperf_copy = sum_rperf;
-    for (int i = 0; i < NUM_ITER; i++) {
+    for (int i = ITER_COUNT; i < ITER_NUM; i++) {
         // A single iteration
         iter(paths, sum_rperf, congestion, graph, last_start, last_end, temp);
 
@@ -329,13 +348,13 @@ void iterMultiple(PathPQ& paths, double& sum_rperf, unordered_map<string, int>& 
                 sum_rperf = sum_rperf_copy;
             }
 
-            cout << "ITER" << i << " ACC" << sum_rperf << endl;
+            cout << "ITER " << i << " ACC" << sum_rperf << endl;
         }
     }
     return;
 }
 
-// Code for a generating the route for a single period
+// Code for generating the route for a single period
 void iterSinglePeriod(const int day, const int period, json& route_tables, const Graph& graph) {
     // route_tables is the floyd_warshall's routes for all students at all periods generated from gerRoutesfromTimetable()
     // Initialize the congestion matrix
@@ -348,21 +367,24 @@ void iterSinglePeriod(const int day, const int period, json& route_tables, const
 
     // Get the congestion for the period
     for (const auto& [student, route_table] : route_tables.items()) {
-        vector<string> route = vectorizeString(route_table[to_string(day)][to_string(period)]);
-        for (int i = 0; i < route.size() - 1; i++) congestion[route[i]+route[i+1]]++;
+        vector<string> route = vectorizeString(route_table[to_string(day)][to_string(period)].get<string>());
+        for (int i = 0; i < route.size() - 1; i++) {
+            congestion[route[i]+route[i+1]]++;
+            congestion[route[i+1]+route[i]]++;
+        }
     }
 
     // Update the pq of paths
     PathPQ paths;
     double sum_rperf = 0;
     for (const auto& [student, route_table] : route_tables.items()) {
-        vector<string> route = vectorizeString(route_table[to_string(day)][to_string(period)]);
+        vector<string> route = vectorizeString(route_table[to_string(day)][to_string(period)].get<string>());
         double rperf = computePerformanceIndex(route, congestion, graph);
         StudentPath path = {student, rperf, route};
         paths.push(path);
         sum_rperf += rperf;
     }
-    cout << "INITIAL APPROXIMATION: " << sum_rperf << endl;
+    cout << "INITIAL PERFORMACE: " << sum_rperf << endl;
 
     // Run the iterations
     iterMultiple(paths, sum_rperf, congestion, graph);
@@ -374,56 +396,184 @@ void iterSinglePeriod(const int day, const int period, json& route_tables, const
         route_tables[path.id][to_string(day)][to_string(period)] = concatenate(path.path);
     }
 
-    cout << "FINAL APPROXIMATION: " << sum_rperf << endl;
+    cout << "FINAL PERFORMANCE: " << sum_rperf << endl;
 
     return;
 }
 
-int main() {
-    string timetable_path = "../assets/timetable_with_gt_0.json";
+// Code for generating the route for a single day, with each iter covering all periods
+void iterSingleDay(const int day, json& route_tables, const Graph& graph) {
+    PathPQ paths[15], paths_copy[15];
+    double sum_rperf[15] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, sum_rperf_copy[15];
+    unordered_map<string, int> congestions[15];
+    double prev_best_rperf[15];
 
-    /*
-    ios::sync_with_stdio(false);
-    cin.tie(0);
-    getline(cin, timetable_path);
-    */
+    for (int period = 0; period <= 11; period++) {
+        if (period == 1 || period == 3 || period == 8 || period == 10) continue;  // All the students are having classes right now
+        
+        
+        for (const auto& [node, edges] : graph) {
+            for (const auto& edge : edges) {
+                congestions[period][node+edge.dest] = 0;
+            }
+        }
 
-    // parse the timetable json file
-    ifstream input_file(timetable_path);
-    if (!input_file.is_open()) {
-        cerr << "Failed to open the timetable file." << endl;
-        return 1;
+        // Get the congestion for the period
+        for (const auto& [student, route_table] : route_tables.items()) {
+            const string route_str = route_table[to_string(day)][to_string(period)];
+            if (route_str == "") continue;
+            vector<string> route = vectorizeString(route_str);
+            for (int i = 0; i < route.size() - 1; i++) {
+                congestions[period][route[i]+route[i+1]]++;
+                congestions[period][route[i+1]+route[i]]++;
+            }
+        }
+
+        for (const auto& [student, route_table] : route_tables.items()) {
+            const string route_str = route_table[to_string(day)][to_string(period)];
+            vector<string> route;
+            if (route_str == "") route = {"G", "G"};  // if this student is having a spare class
+            else route = vectorizeString(route_str);
+            double rperf = computePerformanceIndex(route, congestions[period], graph);
+            StudentPath path = {student, rperf, route};
+            paths[period].push(path);
+            sum_rperf[period] += rperf;
+        }
+
+        paths_copy[period] = paths[period];
+        sum_rperf_copy[period] = sum_rperf[period];
+        prev_best_rperf[period] = sum_rperf[period];
+
+        cout << "PERIOD " << period << " INITIAL PERFORMANCE: " << sum_rperf[period] << endl;
     }
 
-    // save the timetable
-    json timetables;
-    input_file >> timetables;
-    input_file.close();
+    string last_start[15], last_end[15];
+    vector<StudentPath> temp[15];
+    for (int i = ITER_COUNT; i <= ITER_NUM; i++) {
+        for (int period = 0; period <= 11; period++) {
+            if (period == 1 || period == 3 || period == 8 || period == 10) continue;  // All the students are having classes right now
+
+            iter(paths[period], sum_rperf[period], congestions[period], graph, last_start[period], last_end[period], temp[period]);
+            prev_best_rperf[period] = min(sum_rperf[period], prev_best_rperf[period]);
+
+            if (i % BATCH_SIZE | i == 0) cout << fixed << setprecision(0) << "0 " << i << ' ' << day << ' ' << period << ' ' << sum_rperf[period] << ' ' << prev_best_rperf[period] << endl;
+            else {
+                for (const auto& [node, edges] : graph) {
+                    for (const auto& edge : edges) {
+                        congestions[period][node+edge.dest] = 0;
+                    }
+                }
+
+                vector<StudentPath> all_paths; // contain all the paths from paths pq and temp vector
+                PathPQ new_paths;
+                // Get the congestion for the period
+                while (! paths[period].empty()) {
+                    StudentPath path = paths[period].top();
+                    vector<string> route = path.path;
+                    paths[period].pop();
+                    for (int i = 0; i < route.size() - 1; i++) congestions[period][route[i]+route[i+1]]++;
+                    new_paths.push(path);
+                    all_paths.push_back(path);
+                }
+
+                for (const StudentPath& path : temp[period]) {
+                    vector<string> route = path.path;
+                    for (int i = 0; i < route.size() - 1; i++) congestions[period][route[i]+route[i+1]]++;
+                    all_paths.push_back(path);
+                }
+
+                sum_rperf[period] = 0.0;
+                for (const StudentPath& path : all_paths) {
+                    double rperf = computePerformanceIndex(path.path, congestions[period], graph);
+                    sum_rperf[period] += rperf;
+                }
+
+                paths[period] = new_paths;
+
+                if (sum_rperf[period] > sum_rperf_copy[period]) {
+                    temp[period].push_back(paths_copy[period].top());
+                    paths_copy[period].pop();
+                    paths[period] = paths_copy[period];
+                    sum_rperf[period] = sum_rperf_copy[period];
+                }
+                else {
+                    paths_copy[period] = paths[period];
+                    sum_rperf_copy[period] = sum_rperf[period];
+                }
+
+                cout << fixed << setprecision(0) << "1 " << i << ' ' << day << ' ' << period << ' ' << sum_rperf[period] << ' ' << prev_best_rperf[period] << endl;
+            }
+
+            if (! (i % ITER_SAVE_STEPS) && period == 0 && i) {  // for every 500 iterations dump the json file
+                vector<pair<string, string>> all_paths; // contain the students and their related paths
+
+                while (! paths[period].empty()) {
+                    StudentPath path = paths[period].top();
+                    paths[period].pop();
+                    all_paths.push_back({path.id, concatenate(path.path)});
+                }
+
+                for (const StudentPath& path : temp[period]) 
+                    all_paths.push_back({path.id, concatenate(path.path)});
+
+                for (const auto& path : all_paths) 
+                    route_tables[path.first][to_string(day)][to_string(period)] = path.second;
+
+                json iter_output;
+                iter_output["iter"] = i;
+                iter_output["routes"] = route_tables;
+
+                ofstream iter_output_file(ROUTE_FILE_PATH);
+                if (iter_output_file.is_open()) {
+                    iter_output_file << iter_output.dump(4); // 4 spaces for indentation
+                    iter_output_file.close();
+                    cout << "JSON data written to routes.json successfully." << endl;
+                } else {
+                    cerr << "Failed to open the file for writing." << endl;
+                }
+            }
+        }
+    }
+}
+
+int main(int argc, char** argv) {
+    // args parsing
+    int day;
+    for (int i = 0; i < argc; ++i) {
+        if (strcmp(argv[i], "-b") == 0 && i + 1 < argc) {   // Batch Size: the amount of iterations before updating the congestion
+            BATCH_SIZE = stoi(argv[i + 1]);
+        }
+        if (strcmp(argv[i], "-f") == 0 && i + 1 < argc) {  // Route File Path: the path to the routes file
+            ROUTE_FILE_PATH = argv[i + 1]; 
+        }
+        if (strcmp(argv[i], "-d") == 0 && i + 1 < argc) {   // Day: the day to run the algorithm for
+            day = stoi(argv[i + 1]);
+        }
+        if (strcmp(argv[i], "-s") == 0 && i + 1 < argc) {   // Save Iteration Step: the amount of iterations to before each save
+            ITER_SAVE_STEPS = stoi(argv[i + 1]);
+        }
+    }
 
     // parse the shortest paths json file
-    ifstream paths_file("../assets/shortest_paths.json");
-    if (! paths_file.is_open()) {
-        cerr << "Failed to open shortest_paths.json" << endl;
+    ifstream route_tables_file(ROUTE_FILE_PATH);
+    if (! route_tables_file.is_open()) {
+        cerr << "Failed to open routes file" << endl;
         return 1;
     }
 
     // save the shortest paths
-    json shortest_paths;
-    paths_file >> shortest_paths;
-    paths_file.close();
+    json route_tables;
+    route_tables_file >> route_tables;
+    route_tables_file.close();
+
+    ITER_COUNT = route_tables["iter"];
+    route_tables = route_tables["routes"];
 
     // create the layout graph for the school
     Graph graph = createSchoolGraph("../assets/paths.txt");
 
-    // get the routes from the timetable
-    json route_tables = getRoutesfromTimetable(timetables, graph, shortest_paths);
-
-    auto start = chrono::high_resolution_clock::now();
     // run the algorithm for a period
-    iterSinglePeriod(2, 2, route_tables, graph);
-    auto end = chrono::high_resolution_clock::now();
-    chrono::duration<double> elapsed = end - start;
-    cout << "Time taken: " << elapsed.count() << " seconds" << endl;
+    iterSingleDay(day, route_tables, graph);
 
     return 0;
 }
