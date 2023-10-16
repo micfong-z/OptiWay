@@ -70,5 +70,8 @@ For each route $r$ for a student between two specific periods, we give the route
 The performance index for $r$ is:
 
 $$
-r_\mathrm{perf}=\sum^n_{i=1}\left[ w_i\cdot\left(2+\frac{e^{(c_i-300)/200}-e^{-(c_i-300)/200}}{e^{(c_i-300)/200}+e^{-(c_i-300)/200}}\right)\right]
+\begin{align}
+r_\mathrm{perf}&=\sum^n_{i=1}\left[ w_i\cdot\left(2+\frac{e^{(c_i-300)/200}-e^{-(c_i-300)/200}}{e^{(c_i-300)/200}+e^{-(c_i-300)/200}}\right)\right]\\
+&=\sum^n_{i=1}\left[ w_i\cdot\left(2+\tanh\left(\frac{c_i-300}{200}\right)\right)\right]
+\end{align}
 $$

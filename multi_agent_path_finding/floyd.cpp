@@ -288,7 +288,7 @@ int main() {
 
     ofstream file("routes.json");
     if (file.is_open()) {
-        file << routes.dump(4); // 4 spaces for indentation
+        file << routes.dump(); // faster i/o
         file.close();
         cout << "JSON data written to routes.json successfully." << endl;
     } else {
