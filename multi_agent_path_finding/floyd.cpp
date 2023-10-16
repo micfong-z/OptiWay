@@ -223,6 +223,33 @@ void generate_all_paths(const Graph& graph) {
     }
 }
 
+void generate_all_floyd_distances(const Graph& graph) {
+    DistanceMatrix dist;
+    PredecessorMatrix pred;
+
+    initializeDistanceAndPredecessorMatrices(graph, dist, pred);
+    floydWarshall(graph, dist, pred);
+
+    json distances;
+    for (const auto [room1, _] : graph) {
+        for (const auto [room2, __] : graph) {
+            if (room1[0] != 'A' && room1[0] != 'B' && room1[0] != 'G') continue;
+            if (room2[0] != 'A' && room2[0] != 'B' && room2[0] != 'G') continue;
+            if (room1 == room2) continue;
+            distances[room1+room2] = dist[room1][room2];
+        }
+    }
+
+    std::ofstream file("../assets/distances.json");
+    if (file.is_open()) {
+        file << distances.dump(4); // 4 spaces for indentation
+        file.close();
+        std::cout << "JSON data written to distances.json successfully." << endl;
+    } else {
+        std::cerr << "Failed to open the file for writing." << endl;
+    }
+}
+
 int main() {
     string timetable_path;
 
