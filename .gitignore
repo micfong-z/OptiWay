@@ -1,9 +1,9 @@
 .DS_Store
 .VSCodeCounter
 .vscode
+.idea
 optiway/target
+optiway/bin
 *.out
 multi_agent_path_finding/output
 **/routes.json
-optiway/bin
-.idea
