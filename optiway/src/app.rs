@@ -1,7 +1,6 @@
 use std::{
     collections::HashMap,
     f32::consts::PI,
-    fmt::Display,
     fs::{self, File},
     io::{BufRead, Read, Write},
     path::{Path, PathBuf},
@@ -18,20 +17,6 @@ use num_format::{Locale, ToFormattedString};
 use rfd::FileDialog;
 
 use crate::{md_icons::material_design_icons, setup_custom_fonts, setup_custom_styles};
-
-#[derive(Default, Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub enum Algorithm {
-    #[default]
-    Shortest,
-}
-
-impl Display for Algorithm {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Algorithm::Shortest => write!(f, "Minimize distance"),
-        }
-    }
-}
 
 #[derive(Default, Clone, PartialEq, Eq)]
 enum TimetableValidationStatus {
@@ -90,6 +75,15 @@ enum CongestionStatus {
     GeneratingPI(i32, String),
     Successful,
 }
+impl CongestionStatus {
+    fn is_generating(&self) -> bool {
+        if let CongestionStatus::Generating(_, _) = self {
+            true
+        } else {
+            matches!(self, CongestionStatus::GeneratingPI(_, _))
+        }
+    }
+}
 
 type Routes = HashMap<String, HashMap<u32, HashMap<usize, String>>>;
 type CongestionPoint = HashMap<u32, HashMap<usize, HashMap<String, u32>>>;
@@ -133,7 +127,6 @@ impl Default for CongestionStatistics {
 pub struct OptiWayApp {
     selected_student: Option<String>,
     student_list: Arc<Mutex<Vec<String>>>,
-    selected_algorithm: Algorithm,
     selected_period: usize,
     selected_day: u32,
     selected_floor: [bool; 9],
@@ -176,7 +169,6 @@ impl Default for OptiWayApp {
         Self {
             selected_student: Default::default(),
             student_list: Default::default(),
-            selected_algorithm: Default::default(),
             selected_period: 0,
             selected_day: 1,
             selected_floor: floors,
@@ -313,7 +305,7 @@ impl OptiWayApp {
             ui.heading("Metadata");
             Grid::new("path_generation_grid").num_columns(2).show(ui, |ui| {
                 ui.label("Algorithm");
-                ui.label(format!("{}", self.selected_algorithm));
+                ui.label("Minimize distance");
                 ui.end_row();
 
                 ui.label("Student count");
@@ -340,8 +332,8 @@ impl OptiWayApp {
                     let filepath = self.timetable_file_info.filepath.clone();
                     let path_generation_status_arc = self.path_generation_status.clone();
                     let student_paths_arc = self.student_routes.clone();
-                    let shortest_paths_json = self.shortest_paths_json.clone();
                     // thread::spawn(move || run_floyd_algorithm_cpp(filepath, path_generation_status_arc, student_paths_arc));
+                    let shortest_paths_json = self.shortest_paths_json.clone();
                     thread::spawn(move || run_floyd_algorithm_rust(filepath, shortest_paths_json, path_generation_status_arc, student_paths_arc));
                 }
                 PathGenerationStatus::Generating(_progress, message) => {
@@ -954,7 +946,7 @@ impl OptiWayApp {
     }
 
     fn show_timetable_window(&mut self, ctx: &egui::Context) {
-        Window::new("Timetable").show(ctx, |ui| {
+        Window::new("Timetable").open(&mut self.show_timetable_window).show(ctx, |ui| {
             if self
                 .timetable_file_info
                 .validation_status
@@ -1077,6 +1069,8 @@ impl OptiWayApp {
                         .sum::<u128>()
                         .to_formatted_string(&Locale::fr),
                 );
+                ui.separator();
+                ui.label("Performance indices measure the overall performance of the routes. The lower the value, the better the performance.");
             });
     }
 }
@@ -1142,6 +1136,7 @@ fn run_floyd_algorithm_cpp(
     }
 }
 
+#[allow(dead_code)]
 fn run_floyd_algorithm_rust(
     filepath: PathBuf,
     shortest_paths_json: HashMap<String, String>,
@@ -1305,6 +1300,7 @@ impl eframe::App for OptiWayApp {
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
                 ui.label("OptiWay");
+                egui::warn_if_debug_build(ui);
                 ui.separator();
                 if current_validation_status != TimetableValidationStatus::Successful {
                     ui.label(material_design_icons::MDI_CALENDAR_ALERT)
@@ -1333,6 +1329,8 @@ impl eframe::App for OptiWayApp {
                         ui.label("Calculating path");
                     } else if current_path_status.is_loading_json() {
                         ui.label("Loading paths");
+                    } else if current_congestion_status.is_generating() {
+                        ui.label("Evaluating congestion");
                     } else {
                         ui.label("Ready");
                     }
@@ -1343,7 +1341,8 @@ impl eframe::App for OptiWayApp {
         egui::SidePanel::right("side_panel").show(ctx, |ui| {
             egui::ScrollArea::vertical().show(ui, |ui| {
                 ui.with_layout(Layout::top_down_justified(egui::Align::LEFT), |ui| {
-                    ui.heading("Data source");
+                    ui.heading("Command center")
+                        .on_hover_text("Follow the order of the buttons from top to bottom to complete the process.");
                     if ui.button("Import timetable").clicked() {
                         let file = FileDialog::new()
                             .add_filter("JSON", &["json"])
@@ -1359,20 +1358,12 @@ impl eframe::App for OptiWayApp {
                             self.selected_student = None;
                         }
                     }
-                    ComboBox::from_label("Algorithm")
-                        .selected_text(self.selected_algorithm.to_string())
-                        .show_ui(ui, |ui| {
-                            ui.selectable_value(
-                                &mut self.selected_algorithm,
-                                Algorithm::Shortest,
-                                "Minimize distance",
-                            );
-                        });
                     ui.add_enabled_ui(
                         current_validation_status == TimetableValidationStatus::Successful,
                         |ui| {
                             if ui
-                                .button("OptiWay!")
+                                .button("Baseline benchmark")
+                                .on_hover_text("Generate shortest routes for all students as a baseline plan.")
                                 .on_disabled_hover_text("Import a timetable first.")
                                 .clicked()
                             {
@@ -1387,7 +1378,7 @@ impl eframe::App for OptiWayApp {
                         |ui| {
                             if ui
                                 .button("Calculate congestion")
-                                .on_disabled_hover_text("Caculate routes first.")
+                                .on_disabled_hover_text("Calculate routes first.")
                                 .clicked()
                             {
                                 self.show_congestion_window = true;
@@ -1437,18 +1428,23 @@ impl eframe::App for OptiWayApp {
                             }
                         });
                     ui.separator();
-                    ui.heading("Path");
-                    if ui.button("Export path (all students)").clicked() {
-                        todo!();
-                    }
-                    if ui.button("Export path (current student)").clicked() {
-                        todo!();
-                    }
+                    ui.heading("Panels");
                     if ui.button("Show path as text").clicked() {
                         self.show_path_window = true;
                     }
                     if ui.button("Show timetable").clicked() {
                         self.show_timetable_window = true;
+                    }
+                    if ui.button("Show performance indices").clicked() {
+                        self.show_pi_window = true;
+                    }
+                    ui.separator();
+                    ui.heading("Export");
+                    if ui.button("Export path (all students)").clicked() {
+                        todo!();
+                    }
+                    if ui.button("Export path (current student)").clicked() {
+                        todo!();
                     }
                     ui.separator();
                     ui.heading("Floor view");
@@ -1534,40 +1530,35 @@ impl eframe::App for OptiWayApp {
                             Slider::new(&mut self.congestion_filter, 0..=400)
                                 .text("Minimum congestion"),
                         );
-                        if ui.button("Show performance indices").clicked() {
-                            self.show_pi_window = true;
-                        }
                     } else {
-                        ui.collapsing("Path color", |ui| {
-                            ui.horizontal(|ui| {
-                                ui.vertical(|ui| {
-                                    ui.label("Active path color");
-                                    if ui.button("Reset").clicked() {
-                                        self.active_path_color =
-                                            Color32::from_rgb(0xec, 0x6f, 0x27);
-                                    }
-                                });
-                                color_picker::color_picker_color32(
-                                    ui,
-                                    &mut self.active_path_color,
-                                    color_picker::Alpha::Opaque,
-                                );
+                        ui.horizontal(|ui| {
+                            ui.vertical(|ui| {
+                                ui.label("Active path color");
+                                if ui.button("Reset").clicked() {
+                                    self.active_path_color =
+                                        Color32::from_rgb(0xec, 0x6f, 0x27);
+                                }
                             });
-                            ui.separator();
+                            color_picker::color_picker_color32(
+                                ui,
+                                &mut self.active_path_color,
+                                color_picker::Alpha::Opaque,
+                            );
+                        });
+                        ui.separator();
 
-                            ui.horizontal(|ui| {
-                                ui.vertical(|ui| {
-                                    ui.label("Inactive path color");
-                                    if ui.button("Reset").clicked() {
-                                        self.inactive_path_color = Color32::from_gray(0x61);
-                                    }
-                                });
-                                color_picker::color_picker_color32(
-                                    ui,
-                                    &mut self.inactive_path_color,
-                                    color_picker::Alpha::Opaque,
-                                );
+                        ui.horizontal(|ui| {
+                            ui.vertical(|ui| {
+                                ui.label("Inactive path color");
+                                if ui.button("Reset").clicked() {
+                                    self.inactive_path_color = Color32::from_gray(0x61);
+                                }
                             });
+                            color_picker::color_picker_color32(
+                                ui,
+                                &mut self.inactive_path_color,
+                                color_picker::Alpha::Opaque,
+                            );
                         });
                     }
                 });
@@ -1656,11 +1647,6 @@ impl eframe::App for OptiWayApp {
                 });
                 textures.push(texture_cur.clone());
             }
-            ui.horizontal(|ui| {
-                ui.heading("OptiWay");
-                egui::warn_if_debug_build(ui);
-            });
-
             let desired_size = ui.available_size_before_wrap();
             if desired_size.y < desired_size.x / 2243.0 * (1221.0 + 350.0) {
                 ui.label("▲ There may not be enough space to display the floor plan.");

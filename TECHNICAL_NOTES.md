@@ -75,3 +75,29 @@ r_\mathrm{perf}&=\sum^n_{i=1}\left[ w_i\cdot\left(2+\frac{e^{(c_i-300)/200}-e^{-
 &=\sum^n_{i=1}\left[ w_i\cdot\left(2+\tanh\left(\frac{c_i-300}{200}\right)\right)\right]
 \end{align}
 $$
+
+## Optimization Output
+
+During path optimization, the program should continuously output lines in the following format for each batch:
+
+```
+[flag (0/1)] [iteration] [day# (1-5)] [period# (0-11)] [current r_perf] [previous best r_perf]
+```
+
+Where `[flag]` indicates whether a new route JSON file has been dumped after current iteration.
+
+Example output:
+```
+1 12300 2 4 12345678 12345690
+0 12400 2 5 12345678 12345678
+0 12500 2 6 12345660 12345678
+```
+
+Note that the program should **not** output a line at `iteration=0`.
+
+## Optimization CLI arguments
+
+- `-f [path]` The source JSON file path.
+- `-b [number]` The size of each batch.
+- `-i [number]` The number of iterations each time.
+- `-d [number]` The day to evaluate on.
