@@ -2,7 +2,7 @@ use std::{
     collections::HashMap,
     f32::consts::PI,
     fs::{self, File},
-    io::{BufRead, Read, Write},
+    io::{BufRead, Read, Write, BufReader},
     path::{Path, PathBuf},
     process::{Command, Stdio},
     sync::{Arc, Mutex},
@@ -13,6 +13,7 @@ use egui::{
     color_picker, emath, pos2, CentralPanel, Color32, ColorImage, ComboBox, Grid, Layout,
     ProgressBar, Rect, RichText, Slider, Stroke, TextureHandle, Window,
 };
+use signal_child::Signalable;
 use num_format::{Locale, ToFormattedString};
 use rfd::FileDialog;
 
@@ -34,6 +35,16 @@ impl TimetableValidationStatus {
             _ => String::new(),
         }
     }
+}
+
+#[derive(Default, Clone, PartialEq, Eq)]
+enum OptimizationStatus {
+    #[default]
+    ParamInput,
+    Ready,
+    Calculating,
+    AbortSignal,
+    Failed(String),
 }
 
 #[derive(Default)]
@@ -155,11 +166,23 @@ pub struct OptiWayApp {
     show_congestion_path: bool,
     show_congestion_point: bool,
     show_pi_window: bool,
+    #[allow(unused)]
     shortest_paths_json: HashMap<String, String>,
+    shortest_paths_content: Arc<Mutex<String>>,
     show_pi_shortest: bool,
     performance_indices_shortest: Arc<Mutex<HashMap<u32, HashMap<usize, u128>>>>,
     performance_indices_optimized: Arc<Mutex<HashMap<u32, HashMap<usize, u128>>>>,
     path_distances: Arc<Mutex<HashMap<String, HashMap<String, u32>>>>,
+    optimization_status: Arc<Mutex<OptimizationStatus>>,
+    show_optimization_window: bool,
+    param_batch_size: u32,
+    param_save_every: u32,
+    param_use_shortest_path: bool,
+    param_day: u32,
+    param_filename: String,
+    param_filepath: PathBuf,
+    current_iter: Arc<Mutex<[u64; 5]>>,
+    current_period_iter: Arc<Mutex<[u64; 5]>>,
 }
 
 impl Default for OptiWayApp {
@@ -280,6 +303,17 @@ impl Default for OptiWayApp {
                 }
                 path_distances
             })),
+            optimization_status: Default::default(),
+            show_optimization_window: false,
+            param_batch_size: 100,
+            param_save_every: 2500,
+            param_use_shortest_path: true,
+            param_day: 1,
+            param_filename: Default::default(),
+            param_filepath: Default::default(),
+            shortest_paths_content: Default::default(),
+            current_iter: Default::default(),
+            current_period_iter: Default::default(),
         }
     }
 }
@@ -332,9 +366,13 @@ impl OptiWayApp {
                     let filepath = self.timetable_file_info.filepath.clone();
                     let path_generation_status_arc = self.path_generation_status.clone();
                     let student_paths_arc = self.student_routes.clone();
-                    // thread::spawn(move || run_floyd_algorithm_cpp(filepath, path_generation_status_arc, student_paths_arc));
-                    let shortest_paths_json = self.shortest_paths_json.clone();
-                    thread::spawn(move || run_floyd_algorithm_rust(filepath, shortest_paths_json, path_generation_status_arc, student_paths_arc));
+                    let shortest_paths_content_arc = self.shortest_paths_content.clone();
+                    thread::spawn(move || {
+                        *shortest_paths_content_arc.lock().unwrap() =
+                            run_floyd_algorithm_cpp(filepath, path_generation_status_arc, student_paths_arc)
+                    });
+                    // let shortest_paths_json = self.shortest_paths_json.clone();
+                    // thread::spawn(move || run_floyd_algorithm_rust(filepath, shortest_paths_json, path_generation_status_arc, student_paths_arc));
                 }
                 PathGenerationStatus::Generating(_progress, message) => {
                     ui.with_layout(Layout::top_down_justified(egui::Align::Center), |ui| {
@@ -385,6 +423,207 @@ impl OptiWayApp {
                         }
                     });
                 }
+            }
+        });
+    }
+
+    fn show_optimization_window(
+        &mut self,
+        ctx: &egui::Context,
+        current_optimization_status: OptimizationStatus,
+    ) {
+        Window::new("Route Optimization").show(ctx, |ui| {
+            match current_optimization_status {
+                OptimizationStatus::ParamInput => {
+                    ui.heading("Parameters");
+                    ui.add(
+                        Slider::new(&mut self.param_batch_size, 10..=200)
+                            .step_by(10.0)
+                            .text("Batch size"),
+                    );
+                    ui.add(
+                        Slider::new(&mut self.param_save_every, 100..=5000)
+                            .step_by(100.0)
+                            .text("Iterations per save")
+                    );
+                    // ComboBox::from_label("Day of Week")
+                    //     .selected_text(convert_day_of_week(self.param_day))
+                    //     .show_ui(ui, |ui| {
+                    //         for i in 1..=5 {
+                    //             ui.selectable_value(
+                    //                 &mut self.param_day,
+                    //                 i,
+                    //                 convert_day_of_week(i),
+                    //             );
+                    //         }
+                    //     });
+                    ui.horizontal(|ui| {
+                        ui.checkbox(&mut self.param_use_shortest_path, "Use shortest routes");
+                        ui.add_enabled_ui(!self.param_use_shortest_path, |ui| {
+                            if ui.button("Select route file").clicked() {
+                                let file = FileDialog::new()
+                                    .add_filter("JSON", &["json"])
+                                    .set_directory("../")
+                                    .pick_file();
+                                if let Some(file) = file {
+                                    self.param_filename = file.file_name().unwrap().to_str().unwrap().to_owned();
+                                    self.param_filepath = file;
+                                }
+                            }
+                        });
+                        if !self.param_use_shortest_path {
+                            ui.label(if self.param_filename.is_empty() {
+                                "No file selected.".to_owned()
+                            } else {
+                                self.param_filename.clone()
+                            });
+                        }
+                    });
+                    ui.separator();
+                    ui.with_layout(Layout::top_down_justified(egui::Align::Center), |ui| {
+                        if ui.button("Reset parameters").clicked() {
+                            self.param_batch_size = 100;
+                            self.param_save_every = 2500;
+                            self.param_use_shortest_path = true;
+                            self.param_day = 1;
+                            self.param_filename = Default::default();
+                            self.param_filepath = Default::default();
+                        }
+                        if ui.button("Start").clicked() {
+                            self.show_pi_window = true;
+                            self.show_pi_shortest = false;
+                            *self.optimization_status.lock().unwrap() = OptimizationStatus::Ready;
+                        }
+                    });
+                },
+                OptimizationStatus::Ready => {
+                    *self.optimization_status.lock().unwrap() = OptimizationStatus::Calculating;
+                    let param_use_shortest_path = self.param_use_shortest_path;
+                    let param_batch_size = self.param_batch_size;
+                    let param_save_every = self.param_save_every;
+                    for day in 1..=5 {
+                        let param_day = day;
+                        let mut param_filepath = self.param_filepath.clone();
+                        let optimization_status_arc = self.optimization_status.clone();
+                        let shorest_paths_content_arc = self.shortest_paths_content.clone();
+                        let current_iter_arc = self.current_iter.clone();
+                        let performance_indices_shortest_json = serde_json::to_string(&*self.performance_indices_shortest.lock().unwrap()).unwrap();
+                        let performance_indices_optimized_arc = self.performance_indices_optimized.clone();
+                        let performance_indices_shortest_arc = self.performance_indices_shortest.clone();
+                        let current_period_iter_arc = self.current_period_iter.clone();
+                        if param_use_shortest_path {
+                            self.param_filepath = fs::canonicalize("./bin/routes.json").unwrap();
+                            self.param_filename = "routes.json".to_owned();
+                            self.param_use_shortest_path = false;
+                        } else {
+                            let mut file = File::open(&param_filepath).unwrap();
+                            let mut content = String::new();
+                            file.read_to_string(&mut content).unwrap();
+                            let json: serde_json::Value = serde_json::from_str(&content).unwrap();
+                            for day in 1..=5 {
+                                *self.current_iter.lock().unwrap().get_mut((day - 1) as usize).unwrap() =
+                                    json.get("iter").unwrap().as_u64().unwrap();
+                            }
+                        }
+                        thread::spawn(move || {
+                            if param_use_shortest_path {
+                                let content = "{\"iter\":0,\"indices\":".to_owned() + &performance_indices_shortest_json + ",\"routes\":" + &shorest_paths_content_arc.lock().unwrap().to_owned() + "}";
+                                *performance_indices_optimized_arc.lock().unwrap() = performance_indices_shortest_arc.lock().unwrap().clone();
+                                let mut file = File::create("./bin/routes.json").unwrap();
+                                file.write_all(content.as_bytes()).unwrap();
+                                param_filepath = fs::canonicalize("./bin/routes.json").unwrap();
+                            }
+                            let bin_dir = fs::canonicalize("./bin").unwrap();
+                            if let Ok(mut opt_command) = Command::new("./optimization.out")
+                                .current_dir(bin_dir)
+                                .stdout(Stdio::piped())
+                                .stdin(Stdio::piped())
+                                .args([
+                                    "-f", param_filepath.to_str().unwrap(),
+                                    "-b", &param_batch_size.to_string(),
+                                    "-s", &(param_save_every/5).to_string(),
+                                    "-d", &param_day.to_string(),])
+                                .spawn() {
+                                    if let Some(stdout) = opt_command.stdout.take() {
+                                        let reader = BufReader::new(stdout);
+                                        reader
+                                            .lines()
+                                            .map_while(Result::ok)
+                                            .for_each(|line| {
+                                                // println!("DEBUG>{line}");
+                                                let report: Vec<&str> = line.split(' ').collect();
+                                                if report[0] != "1" {                                                (*current_iter_arc.lock().unwrap())[(param_day - 1) as usize] = report[1].parse::<u64>().unwrap();
+                                                    if optimization_status_arc.lock().unwrap().clone() == OptimizationStatus::AbortSignal {
+                                                        opt_command.interrupt().expect("Failed to interrupt optimization algorithm");
+                                                    }
+                                                    (*current_period_iter_arc.lock().unwrap())[(param_day - 1 ) as usize] = report[3].parse::<u64>().unwrap();
+                                                    *performance_indices_optimized_arc
+                                                        .lock()
+                                                        .unwrap()
+                                                        .get_mut(&param_day)
+                                                        .unwrap()
+                                                        .get_mut(&(report[3].parse::<u64>().unwrap() as usize))
+                                                        .unwrap() = 
+                                                            report[4].parse::<u128>().unwrap()
+                                                            .min(report[5].parse::<u128>().unwrap());
+                                                }
+                                                // TODO: Save JSON record file by combining 5 JSONs
+                                                // TODO: Load the new JSON file routes
+                                            });
+                                    } else {
+                                        *optimization_status_arc.lock().unwrap() =
+                                            OptimizationStatus::Failed("Optimization algorithm terminated unexpectedly".to_owned());
+                                    }
+                            } else {
+                                *optimization_status_arc.lock().unwrap() =
+                                    OptimizationStatus::Failed("Failed to start optimization algorithm".to_owned());
+                            }
+                        });
+                    }
+                },
+                OptimizationStatus::Calculating => {
+                    ui.with_layout(Layout::top_down_justified(egui::Align::Center), |ui| {
+                        ui.label(RichText::new(material_design_icons::MDI_COG).size(32.0));
+                        ui.label("Optimizing paths");
+                        ui.label(format!("Total Iteration: {}", self.current_iter.lock().unwrap().iter().sum::<u64>().to_formatted_string(&Locale::fr)));
+                        ui.spinner();
+                        if ui.button("Pause").clicked() {
+                            *self.optimization_status.lock().unwrap() = OptimizationStatus::AbortSignal;
+                        }
+                    });
+                },
+                OptimizationStatus::AbortSignal => {
+                    ui.with_layout(Layout::top_down_justified(egui::Align::Center), |ui| {
+                        ui.label(
+                            RichText::new(material_design_icons::MDI_COG_PAUSE)
+                                .size(32.0)
+                                .color(Color32::from_rgb(0xff, 0xc1, 0x07)),
+                        );
+                        ui.label("Optimization paused");
+                        ui.label("You may resume optimization at any time.");
+                        if ui.button("Resume").clicked() {
+                            *self.optimization_status.lock().unwrap() = OptimizationStatus::Ready;
+                        }
+                        if ui.button("Close").clicked() {
+                            self.show_optimization_window = false;
+                            *self.optimization_status.lock().unwrap() = OptimizationStatus::ParamInput;
+                        }
+                    });
+                },
+                OptimizationStatus::Failed(message) => {
+                    ui.with_layout(Layout::top_down_justified(egui::Align::Center), |ui| {
+                        ui.label(
+                            RichText::new(material_design_icons::MDI_COG_OFF)
+                                .size(32.0)
+                                .color(Color32::from_rgb(0xe4, 0x37, 0x48)),
+                        );
+                        ui.label("Route optimization failed");
+                        ui.label(message);
+                        if ui.button("Close").clicked() {
+                            self.show_optimization_window = false;
+                        }
+                    });
+                },
             }
         });
     }
@@ -640,6 +879,7 @@ impl OptiWayApp {
                                 performance_indices_shortest.get_mut(&day).unwrap().insert(period, index as u128);    
                             }
                         }
+                        // println!("{}", serde_json::to_string(&performance_indices_shortest).unwrap());
                         *performance_indices_shortest_arc.lock().unwrap() = performance_indices_shortest;
                         *congestion_status_arc.lock().unwrap() = CongestionStatus::Successful;
                     });
@@ -1007,6 +1247,8 @@ impl OptiWayApp {
             .show(ctx, |ui| {
                 let performance_indices_shortest =
                     self.performance_indices_shortest.lock().unwrap();
+                let performance_indices_optimized =
+                    self.performance_indices_optimized.lock().unwrap();
                 ui.horizontal(|ui| {
                     if ui
                         .selectable_label(self.show_pi_shortest, "Shorest Path")
@@ -1024,6 +1266,13 @@ impl OptiWayApp {
                 });
                 ui.separator();
                 ui.label("Performance Indices Overview");
+                let pi_matrix = if self.show_pi_shortest {
+                    performance_indices_shortest
+                } else {
+                    performance_indices_optimized
+                };
+                let hightlights = *self.current_period_iter.lock().unwrap();
+                let optimization_status = self.optimization_status.lock().unwrap().clone();
                 Grid::new("shortest_pi_grid")
                     .striped(true)
                     .num_columns(6)
@@ -1038,10 +1287,15 @@ impl OptiWayApp {
                         for index in 0..=11 {
                             ui.label(convert_periods(index));
                             for day in 1..=5 {
-                                ui.label(
-                                    performance_indices_shortest[&day][&index]
-                                        .to_formatted_string(&Locale::fr),
-                                );
+                                if (hightlights[(day - 1) as usize] as usize == index) && optimization_status == OptimizationStatus::Calculating {
+                                    ui.label(RichText::new(pi_matrix[&day][&index].to_formatted_string(&Locale::fr))
+                                        .color(Color32::from_rgb(0xec, 0x6f, 0x27)));
+                                } else {
+                                    ui.label(
+                                        pi_matrix[&day][&index]
+                                            .to_formatted_string(&Locale::fr),
+                                    );
+                                }
                             }
                             ui.end_row();
                         }
@@ -1049,13 +1303,13 @@ impl OptiWayApp {
                 ui.separator();
                 ui.label("Current Period PI");
                 ui.heading(
-                    performance_indices_shortest[&self.selected_day][&self.selected_period]
+                    pi_matrix[&self.selected_day][&self.selected_period]
                         .to_formatted_string(&Locale::fr),
                 );
                 ui.separator();
                 ui.label("Current Day PI");
                 ui.heading(
-                    performance_indices_shortest[&self.selected_day]
+                    pi_matrix[&self.selected_day]
                         .values()
                         .sum::<u128>()
                         .to_formatted_string(&Locale::fr),
@@ -1063,7 +1317,7 @@ impl OptiWayApp {
                 ui.separator();
                 ui.label("Total PI");
                 ui.heading(
-                    performance_indices_shortest
+                    pi_matrix
                         .values()
                         .map(|day| day.values().sum::<u128>())
                         .sum::<u128>()
@@ -1080,7 +1334,7 @@ fn run_floyd_algorithm_cpp(
     filepath: PathBuf,
     path_generation_status_arc: Arc<Mutex<PathGenerationStatus>>,
     student_paths_arc: Arc<Mutex<Option<Routes>>>,
-) {
+) -> String {
     let bin_dir = fs::canonicalize("./bin").unwrap();
     if let Ok(binding) = fs::canonicalize(filepath) {
         let json_path = binding.to_str().unwrap();
@@ -1108,16 +1362,17 @@ fn run_floyd_algorithm_cpp(
                     *path_generation_status_arc.lock().unwrap() = PathGenerationStatus::Failed(
                         "Failed to read result file [routes.json].".to_owned(),
                     );
-                    return;
+                    return "".to_owned();
                 };
                 let Ok(routes) = serde_json::from_str::<Routes>(&file_content) else {
                     *path_generation_status_arc.lock().unwrap() = PathGenerationStatus::Failed(
                         "Failed to parse result file [routes.json].".to_owned(),
                     );
-                    return;
+                    return "".to_owned();
                 };
                 *student_paths_arc.lock().unwrap() = Some(routes);
                 *path_generation_status_arc.lock().unwrap() = PathGenerationStatus::Successful;
+                return file_content;
             } else {
                 *path_generation_status_arc.lock().unwrap() =
                     PathGenerationStatus::Failed(format!(
@@ -1134,6 +1389,7 @@ fn run_floyd_algorithm_cpp(
         *path_generation_status_arc.lock().unwrap() =
             PathGenerationStatus::Failed("Failed to find timetable file.".to_owned());
     }
+    "".to_owned()
 }
 
 #[allow(dead_code)]
@@ -1297,6 +1553,7 @@ impl eframe::App for OptiWayApp {
             .clone();
         let current_congestion_status = self.congestion_status.lock().unwrap().clone();
         let current_path_status = self.path_generation_status.lock().unwrap().clone();
+        let current_optimization_status = self.optimization_status.lock().unwrap().clone();
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
                 ui.label("OptiWay");
@@ -1331,6 +1588,8 @@ impl eframe::App for OptiWayApp {
                         ui.label("Loading paths");
                     } else if current_congestion_status.is_generating() {
                         ui.label("Evaluating congestion");
+                    } else if current_optimization_status == OptimizationStatus::Calculating {
+                        ui.label("Optimizing routes");
                     } else {
                         ui.label("Ready");
                     }
@@ -1383,6 +1642,20 @@ impl eframe::App for OptiWayApp {
                             {
                                 self.show_congestion_window = true;
                                 *self.congestion_status.lock().unwrap() = CongestionStatus::Ready;
+                            }
+                        },
+                    );
+                    ui.add_enabled_ui(
+                        current_congestion_status == CongestionStatus::Successful,
+                        |ui| {
+                            if ui
+                                .button("Optimize routes")
+                                .on_disabled_hover_text("Calculate congestion first.")
+                                .on_hover_text("Start the optimization iteration process.")
+                                .clicked()
+                            {
+                                self.show_optimization_window = true;
+                                *self.optimization_status.lock().unwrap() = OptimizationStatus::ParamInput;
                             }
                         },
                     );
@@ -1581,9 +1854,11 @@ impl eframe::App for OptiWayApp {
             if self.show_congestion_window {
                 self.show_congestion_window(ctx, current_congestion_status);
             }
-
             if self.show_pi_window {
                 self.show_pi_window(ctx);
+            }
+            if self.show_optimization_window {
+                self.show_optimization_window(ctx, current_optimization_status);
             }
 
             // Paths

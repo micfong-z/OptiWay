@@ -402,7 +402,7 @@ void iterSinglePeriod(const int day, const int period, json& route_tables, const
 }
 
 // Code for generating the route for a single day, with each iter covering all periods
-void iterSingleDay(const int day, json& route_tables, const Graph& graph) {
+void iterSingleDay(const int day, json& route_tables, const Graph& graph, json& perf_indices) {
     PathPQ paths[15], paths_copy[15];
     double sum_rperf[15] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, sum_rperf_copy[15];
     unordered_map<string, int> congestions[15];
@@ -501,7 +501,7 @@ void iterSingleDay(const int day, json& route_tables, const Graph& graph) {
                     paths_copy[period] = paths[period];
                     sum_rperf_copy[period] = sum_rperf[period];
                 }
-
+                perf_indices[to_string(day)][to_string(period)] = int(sum_rperf[period]);
                 cout << fixed << setprecision(0) << "0 " << i << ' ' << day << ' ' << period << ' ' << sum_rperf[period] << ' ' << prev_best_rperf[period] << endl;
             }
 
@@ -522,9 +522,10 @@ void iterSingleDay(const int day, json& route_tables, const Graph& graph) {
 
                 json iter_output;
                 iter_output["iter"] = i;
+                iter_output["indices"] = perf_indices;
                 iter_output["routes"] = route_tables;
 
-                ofstream iter_output_file(ROUTE_FILE_PATH);
+                ofstream iter_output_file(ROUTE_FILE_PATH + "_" + to_string(day) + ".json");
                 if (iter_output_file.is_open()) {
                     iter_output_file << iter_output.dump(); // minimize size
                     iter_output_file.close();
@@ -566,18 +567,19 @@ int main(int argc, char** argv) {
     }
 
     // save the shortest paths
-    json route_tables;
+    json route_tables, perf_indices;
     route_tables_file >> route_tables;
     route_tables_file.close();
 
     ITER_COUNT = route_tables["iter"];
+    perf_indices = route_tables["indices"];
     route_tables = route_tables["routes"];
 
     // create the layout graph for the school
     Graph graph = createSchoolGraph("../assets/paths.txt");
 
     // run the algorithm for a period
-    iterSingleDay(day, route_tables, graph);
+    iterSingleDay(day, route_tables, graph, perf_indices);
 
     return 0;
 }

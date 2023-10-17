@@ -1297,6 +1297,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
+ "signal-child",
  "wasm-bindgen-futures",
 ]
 
@@ -1577,6 +1578,12 @@ dependencies = [
  "serde",
  "yaml-rust",
 ]
+
+[[package]]
+name = "signal-child"
+version = "1.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b2a4eed4c5ae38438470ab8e0108bb751012f786f44ff585cfd837c9a5fe426f"
 
 [[package]]
 name = "simd-adler32"
