@@ -96,7 +96,7 @@ $$
 Floyd-warshall's algorithm is utilized to generate the shortest paths from each room to another. These paths act as baselines for students' paths, as they do not take into account congestion. We pre-calculate the shortest path of every room pair and save them into a JSON file. At runtime, only data retrieval is required, improving the efficiency of our approach.
 
 
-## Multi-objective Multi-agent Path Finding
+## Optimization Algorithm
 
 We have developed a customized algorithm for optimizing the shortest paths absed on multiple objectives, i.e., congestion and distance, based on the performance index defined in [**Path Evaluation**](#path-evaluation). 
 
@@ -118,9 +118,4 @@ The algorithm works as below:
       - note that $c_i$ is not updated here for efficiency, as a minor change in $c_i$ has minor changes to $\sum r_\text{perf}$
 3. **For each batch_size iterations**, we recalculated $c_i$ at each edge, and deduce a new $\sum r_\text{perf}$. If the new $\sum r_\text{perf}$ is greater than that of the last batch, we update the paths.
 
-The full implementation is studed in `multi_agent_path_finding/multi-objective-agent.cpp`. Pratically, we set the number of iterations to a very large number to let user stops it manually. Several arguments are included to run the script, as listed below:
-
-1. `-f`: the file path to the file storing student's paths at each period, and the current iteration count.
-2. `-b`: batch size, the amount of iterations before recalculating the congestion and $\sum r_\text{perf}$.
-3. `-d`: the day to run the algorithm for.
-4. `-s`: the number of iterations to run before dumping the current paths into the JSON file as given in `-f`.
+The full implementation is studed in `multi_agent_path_finding/multi-objective-agent.cpp`. Pratically, we set the number of iterations to a very large number to let user stops it manually.
