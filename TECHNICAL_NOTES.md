@@ -119,3 +119,29 @@ The algorithm works as below:
 3. **For each batch_size iterations**, we recalculated $c_i$ at each edge, and deduce a new $\sum r_\text{perf}$. If the new $\sum r_\text{perf}$ is greater than that of the last batch, we update the paths.
 
 The full implementation is studed in `multi_agent_path_finding/multi-objective-agent.cpp`. Pratically, we set the number of iterations to a very large number, letting the user to stop it manually.
+
+## Optimization Output
+
+During path optimization, the program should continuously output lines in the following format for each batch:
+
+```
+[flag (0/1)] [iteration] [day# (1-5)] [period# (0-11)] [current r_perf] [previous best r_perf]
+```
+
+Where `[flag]` indicates whether a new route JSON file has been dumped after current iteration.
+
+Example output:
+```
+1 12300 2 4 12345678 12345690
+0 12400 2 5 12345678 12345678
+0 12500 2 6 12345660 12345678
+```
+
+Note that the program should **not** output a line at `iteration=0`.
+
+## Optimization CLI arguments
+
+- `-f [path]` The source JSON file path.
+- `-b [number]` The size of each batch.
+- `-i [number]` The number of iterations each time.
+- `-d [number]` The day to evaluate on.
