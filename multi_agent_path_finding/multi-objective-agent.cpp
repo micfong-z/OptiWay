@@ -449,7 +449,7 @@ void iterSingleDay(const int day, json& route_tables, const Graph& graph, json& 
 
     string last_start[15], last_end[15];
     vector<StudentPath> temp[15];
-    for (int i = ITER_COUNT; i <= ITER_NUM; i++) {
+    for (int i = ITER_COUNT + 1; i <= ITER_NUM; i++) {
         for (int period = 0; period <= 11; period++) {
             if (period == 1 || period == 3 || period == 8 || period == 10) continue;  // All the students are having classes right now
 
@@ -501,6 +501,7 @@ void iterSingleDay(const int day, json& route_tables, const Graph& graph, json& 
                     paths_copy[period] = paths[period];
                     sum_rperf_copy[period] = sum_rperf[period];
                 }
+                prev_best_rperf[period] = min(sum_rperf[period], prev_best_rperf[period]);
                 perf_indices[to_string(day)][to_string(period)] = int(sum_rperf[period]);
                 cout << fixed << setprecision(0) << "0 " << i << ' ' << day << ' ' << period << ' ' << sum_rperf[period] << ' ' << prev_best_rperf[period] << endl;
             }
@@ -571,7 +572,7 @@ int main(int argc, char** argv) {
     route_tables_file >> route_tables;
     route_tables_file.close();
 
-    ITER_COUNT = route_tables["iter"];
+    ITER_COUNT = route_tables["iter"][day - 1];
     perf_indices = route_tables["indices"];
     route_tables = route_tables["routes"];
 

@@ -6,7 +6,7 @@ use std::{
     path::{Path, PathBuf},
     process::{Command, Stdio},
     sync::{Arc, Mutex},
-    thread,
+    thread, fmt::Display,
 };
 
 use egui::{
@@ -18,6 +18,22 @@ use num_format::{Locale, ToFormattedString};
 use rfd::FileDialog;
 
 use crate::{md_icons::material_design_icons, setup_custom_fonts, setup_custom_styles};
+
+#[derive(Default, Clone, PartialEq, Eq)]
+enum PathDisplay {
+    #[default]
+    Shortest,
+    Optimized,
+}
+
+impl Display for PathDisplay {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PathDisplay::Shortest => write!(f, "Shortest route"),
+            PathDisplay::Optimized => write!(f, "Optimized route"),
+        }
+    }
+}
 
 #[derive(Default, Clone, PartialEq, Eq)]
 enum TimetableValidationStatus {
@@ -35,6 +51,20 @@ impl TimetableValidationStatus {
             _ => String::new(),
         }
     }
+}
+
+#[derive(Default, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+struct MainJSONOutputFile {
+    iter: [u64; 5],
+    indices: HashMap<u32, HashMap<usize, u128>>,
+    routes: HashMap<String, HashMap<u32, HashMap<usize, String>>>,
+}
+
+#[derive(Default, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+struct SubJSONOutputFile {
+    iter: u64,
+    indices: HashMap<u32, HashMap<usize, u128>>,
+    routes: HashMap<String, HashMap<u32, HashMap<usize, String>>>,
 }
 
 #[derive(Default, Clone, PartialEq, Eq)]
@@ -153,14 +183,19 @@ pub struct OptiWayApp {
     student_number_search: String,
     path_generation_status: Arc<Mutex<PathGenerationStatus>>,
     show_path_gen_window: bool,
-    student_routes: Arc<Mutex<Option<Routes>>>,
+    student_routes_shortest: Arc<Mutex<Option<Routes>>>,
+    student_routes_optimized: Arc<Mutex<Option<Routes>>>,
     show_timetable_window: bool,
     show_congestion_window: bool,
     congestion_status: Arc<Mutex<CongestionStatus>>,
     congestion_point_data: Arc<Mutex<CongestionPoint>>,
     congestion_path_data: Arc<Mutex<CongestionPath>>,
+    congestion_point_data_opt: Arc<Mutex<CongestionPoint>>,
+    congestion_path_data_opt: Arc<Mutex<CongestionPath>>,
     maximum_congestion: Arc<Mutex<u32>>,
+    maximum_congestion_opt: Arc<Mutex<u32>>,
     congestion_statistics: Arc<Mutex<CongestionStatistics>>,
+    congestion_statistics_opt: Arc<Mutex<CongestionStatistics>>,
     show_congestion: bool,
     congestion_filter: u32,
     show_congestion_path: bool,
@@ -183,6 +218,7 @@ pub struct OptiWayApp {
     param_filepath: PathBuf,
     current_iter: Arc<Mutex<[u64; 5]>>,
     current_period_iter: Arc<Mutex<[u64; 5]>>,
+    path_display: PathDisplay,
 }
 
 impl Default for OptiWayApp {
@@ -212,7 +248,8 @@ impl Default for OptiWayApp {
             student_number_search: Default::default(),
             path_generation_status: Default::default(),
             show_path_gen_window: false,
-            student_routes: Default::default(),
+            student_routes_shortest: Default::default(),
+            student_routes_optimized: Default::default(),
             show_timetable_window: false,
             show_congestion_window: false,
             congestion_status: Default::default(),
@@ -242,8 +279,36 @@ impl Default for OptiWayApp {
                 }
                 congestion_data
             })),
+            congestion_point_data_opt: Arc::new(Mutex::new({
+                let mut congestion_data = CongestionPoint::new();
+                for day in 1..=5 {
+                    congestion_data.insert(day, HashMap::new());
+                    for period in 0..=11 {
+                        congestion_data
+                            .get_mut(&day)
+                            .unwrap()
+                            .insert(period, HashMap::new());
+                    }
+                }
+                congestion_data
+            })),
+            congestion_path_data_opt: Arc::new(Mutex::new({
+                let mut congestion_data = CongestionPath::new();
+                for day in 1..=5 {
+                    congestion_data.insert(day, HashMap::new());
+                    for period in 0..=11 {
+                        congestion_data
+                            .get_mut(&day)
+                            .unwrap()
+                            .insert(period, HashMap::new());
+                    }
+                }
+                congestion_data
+            })),
             congestion_statistics: Default::default(),
+            congestion_statistics_opt: Default::default(),
             maximum_congestion: Default::default(),
+            maximum_congestion_opt: Default::default(),
             show_congestion: false,
             congestion_filter: 0,
             show_congestion_path: true,
@@ -314,6 +379,7 @@ impl Default for OptiWayApp {
             shortest_paths_content: Default::default(),
             current_iter: Default::default(),
             current_period_iter: Default::default(),
+            path_display: Default::default(),
         }
     }
 }
@@ -365,7 +431,7 @@ impl OptiWayApp {
                         PathGenerationStatus::Generating(0, "Calculating path".to_owned());
                     let filepath = self.timetable_file_info.filepath.clone();
                     let path_generation_status_arc = self.path_generation_status.clone();
-                    let student_paths_arc = self.student_routes.clone();
+                    let student_paths_arc = self.student_routes_shortest.clone();
                     let shortest_paths_content_arc = self.shortest_paths_content.clone();
                     thread::spawn(move || {
                         *shortest_paths_content_arc.lock().unwrap() =
@@ -505,7 +571,7 @@ impl OptiWayApp {
                         let param_day = day;
                         let mut param_filepath = self.param_filepath.clone();
                         let optimization_status_arc = self.optimization_status.clone();
-                        let shorest_paths_content_arc = self.shortest_paths_content.clone();
+                        let shortest_paths_content_arc = self.shortest_paths_content.clone();
                         let current_iter_arc = self.current_iter.clone();
                         let performance_indices_shortest_json = serde_json::to_string(&*self.performance_indices_shortest.lock().unwrap()).unwrap();
                         let performance_indices_optimized_arc = self.performance_indices_optimized.clone();
@@ -519,15 +585,20 @@ impl OptiWayApp {
                             let mut file = File::open(&param_filepath).unwrap();
                             let mut content = String::new();
                             file.read_to_string(&mut content).unwrap();
-                            let json: serde_json::Value = serde_json::from_str(&content).unwrap();
+                            let json: MainJSONOutputFile = serde_json::from_str(&content).unwrap();
                             for day in 1..=5 {
                                 *self.current_iter.lock().unwrap().get_mut((day - 1) as usize).unwrap() =
-                                    json.get("iter").unwrap().as_u64().unwrap();
+                                    *json.iter.get((day - 1) as usize).unwrap();
                             }
+                            *self.performance_indices_optimized.lock().unwrap() = json.indices;
                         }
                         thread::spawn(move || {
                             if param_use_shortest_path {
-                                let content = "{\"iter\":0,\"indices\":".to_owned() + &performance_indices_shortest_json + ",\"routes\":" + &shorest_paths_content_arc.lock().unwrap().to_owned() + "}";
+                                let content = "{\"iter\":[0,0,0,0,0],\"indices\":".to_owned()
+                                    + &performance_indices_shortest_json
+                                    + ",\"routes\":"
+                                    + &shortest_paths_content_arc.lock().unwrap().to_owned()
+                                    + "}";
                                 *performance_indices_optimized_arc.lock().unwrap() = performance_indices_shortest_arc.lock().unwrap().clone();
                                 let mut file = File::create("./bin/routes.json").unwrap();
                                 file.write_all(content.as_bytes()).unwrap();
@@ -550,11 +621,15 @@ impl OptiWayApp {
                                             .lines()
                                             .map_while(Result::ok)
                                             .for_each(|line| {
-                                                // println!("DEBUG>{line}");
                                                 let report: Vec<&str> = line.split(' ').collect();
-                                                if report[0] != "1" {                                                (*current_iter_arc.lock().unwrap())[(param_day - 1) as usize] = report[1].parse::<u64>().unwrap();
-                                                    if optimization_status_arc.lock().unwrap().clone() == OptimizationStatus::AbortSignal {
-                                                        opt_command.interrupt().expect("Failed to interrupt optimization algorithm");
+                                                if report[0] != "1" {
+                                                    (*current_iter_arc.lock().unwrap())[(param_day - 1) as usize] = 
+                                                        report[1].parse::<u64>().unwrap();
+                                                    if optimization_status_arc.lock().unwrap().clone() == 
+                                                        OptimizationStatus::AbortSignal {
+                                                        opt_command
+                                                            .interrupt()
+                                                            .expect("Failed to interrupt optimization algorithm");
                                                     }
                                                     (*current_period_iter_arc.lock().unwrap())[(param_day - 1 ) as usize] = report[3].parse::<u64>().unwrap();
                                                     *performance_indices_optimized_arc
@@ -564,11 +639,8 @@ impl OptiWayApp {
                                                         .unwrap()
                                                         .get_mut(&(report[3].parse::<u64>().unwrap() as usize))
                                                         .unwrap() = 
-                                                            report[4].parse::<u128>().unwrap()
-                                                            .min(report[5].parse::<u128>().unwrap());
+                                                            report[4].parse::<u128>().unwrap();
                                                 }
-                                                // TODO: Save JSON record file by combining 5 JSONs
-                                                // TODO: Load the new JSON file routes
                                             });
                                     } else {
                                         *optimization_status_arc.lock().unwrap() =
@@ -585,10 +657,56 @@ impl OptiWayApp {
                     ui.with_layout(Layout::top_down_justified(egui::Align::Center), |ui| {
                         ui.label(RichText::new(material_design_icons::MDI_COG).size(32.0));
                         ui.label("Optimizing paths");
-                        ui.label(format!("Total Iteration: {}", self.current_iter.lock().unwrap().iter().sum::<u64>().to_formatted_string(&Locale::fr)));
+                        ui.label(format!("Total Iteration: {}", 
+                            self.current_iter
+                                .lock()
+                                .unwrap()
+                                .iter()
+                                .sum::<u64>()
+                                .to_formatted_string(&Locale::fr)));
                         ui.spinner();
                         if ui.button("Pause").clicked() {
                             *self.optimization_status.lock().unwrap() = OptimizationStatus::AbortSignal;
+                            // read from routes.json and load the json
+                            let mut file = File::open("./bin/routes.json").unwrap();
+                            let mut content = String::new();
+                            file.read_to_string(&mut content).unwrap();
+                            let mut json: MainJSONOutputFile = serde_json::from_str(&content).unwrap();
+                            let mut sub_jsons: [SubJSONOutputFile; 5] = Default::default();
+                            for i in 1..=5 {
+                                let mut file = File::open(format!("./bin/routes.json_{}.json", i)).unwrap();
+                                let mut content = String::new();
+                                file.read_to_string(&mut content).unwrap();
+                                sub_jsons[i - 1] = serde_json::from_str(&content).unwrap();
+                                json.iter[i - 1] = sub_jsons[i - 1].iter;
+                                *json
+                                    .indices
+                                    .get_mut(&(i as u32))
+                                    .unwrap() = 
+                                        sub_jsons[i - 1]
+                                            .indices
+                                            .get(&(i as u32))
+                                            .unwrap()
+                                            .clone();
+                                for student_number in sub_jsons[i - 1].routes.keys() {
+                                    *json
+                                        .routes
+                                        .get_mut(student_number)
+                                        .unwrap()
+                                        .get_mut(&(i as u32))
+                                        .unwrap() = 
+                                            sub_jsons[i - 1]
+                                                .routes
+                                                .get(student_number)
+                                                .unwrap()
+                                                .get(&(i as u32))
+                                                .unwrap()
+                                                .clone();
+                                }
+                            }
+                            let mut file = File::create("./bin/routes.json").unwrap();
+                            file.write_all(serde_json::to_string(&json).unwrap().as_bytes()).unwrap();
+                            *self.student_routes_optimized.lock().unwrap() = Some(json.routes);
                         }
                     });
                 },
@@ -653,7 +771,33 @@ impl OptiWayApp {
                         }
                         congestion_data
                     };
+                    *self.congestion_point_data_opt.lock().unwrap() = {
+                        let mut congestion_data = CongestionPoint::new();
+                        for day in 1..=5 {
+                            congestion_data.insert(day, HashMap::new());
+                            for period in 0..=11 {
+                                congestion_data
+                                    .get_mut(&day)
+                                    .unwrap()
+                                    .insert(period, HashMap::new());
+                            }
+                        }
+                        congestion_data
+                    };
                     *self.congestion_path_data.lock().unwrap() = {
+                        let mut congestion_data = CongestionPath::new();
+                        for day in 1..=5 {
+                            congestion_data.insert(day, HashMap::new());
+                            for period in 0..=11 {
+                                congestion_data
+                                    .get_mut(&day)
+                                    .unwrap()
+                                    .insert(period, HashMap::new());
+                            }
+                        }
+                        congestion_data
+                    };
+                    *self.congestion_path_data_opt.lock().unwrap() = {
                         let mut congestion_data = CongestionPath::new();
                         for day in 1..=5 {
                             congestion_data.insert(day, HashMap::new());
@@ -668,21 +812,186 @@ impl OptiWayApp {
                     };
                     let congestion_point_data_arc = self.congestion_point_data.clone();
                     let congestion_path_data_arc = self.congestion_path_data.clone();
+                    let congestion_point_data_opt_arc = self.congestion_point_data_opt.clone();
+                    let congestion_path_data_opt_arc = self.congestion_path_data_opt.clone();
                     let congestion_status_arc = self.congestion_status.clone();
                     let max_congestion_arc = self.maximum_congestion.clone();
+                    let max_congestion_opt_arc = self.maximum_congestion_opt.clone();
                     let congestion_statistics_arc = self.congestion_statistics.clone();
+                    let congestion_statistics_opt_arc = self.congestion_statistics_opt.clone();
                     let path_distances_arc = self.path_distances.clone();
                     let mut rooms: Vec<String> = self.projection_coords.clone().keys().map(|k| k.to_owned()).collect();
                     let performance_indices_shortest_arc = self.performance_indices_shortest.clone();
                     rooms.push("G".to_owned());
-                    let student_routes = self.student_routes.lock().unwrap().clone();
+                    let student_routes = self.student_routes_shortest.lock().unwrap().clone();
                     if student_routes.is_none() {
                         *congestion_status_arc.lock().unwrap() =
                             CongestionStatus::Failed("No path data available".to_owned());
                         return;
                     }
                     let student_routes = student_routes.unwrap();
+                    let student_routes_opt = self.student_routes_optimized.lock().unwrap().clone();
                     thread::spawn(move || {
+                        if let Some(student_routes) = student_routes_opt {
+                            for day in 1..=5 {
+                                for period in 0..=11 {
+                                    for room in &rooms {
+                                        congestion_point_data_opt_arc
+                                            .lock()
+                                            .unwrap()
+                                            .get_mut(&day)
+                                            .unwrap()
+                                            .get_mut(&period)
+                                            .unwrap()
+                                            .insert(room.to_owned(), 0);
+                                    }
+                                }
+                            }
+                            for student in &student_routes {
+                                for day in 1..=5 {
+                                    for period in 0..=11 {
+                                        let rooms = student_routes
+                                            .get(student.0)
+                                            .unwrap()
+                                            .get(&day)
+                                            .unwrap()
+                                            .get(&period)
+                                            .unwrap()
+                                            .split(' ')
+                                            .collect::<Vec<&str>>();
+                                        let mut previous_room = "";
+                                        for room in rooms {
+                                            if room.is_empty() || room == "G" {
+                                                continue;
+                                            }
+                                            if !previous_room.is_empty() {
+                                                let contains = congestion_path_data_opt_arc
+                                                    .lock()
+                                                    .unwrap()
+                                                    .get(&day)
+                                                    .unwrap()
+                                                    .get(&period)
+                                                    .unwrap()
+                                                    .contains_key(&(previous_room.to_owned(), room.to_owned()));
+                                                if contains {
+                                                    *congestion_path_data_opt_arc
+                                                        .lock()
+                                                        .unwrap()
+                                                        .get_mut(&day)
+                                                        .unwrap()
+                                                        .get_mut(&period)
+                                                        .unwrap()
+                                                        .get_mut(&(previous_room.to_owned(), room.to_owned()))
+                                                        .unwrap() += 1;
+                                                } else {
+                                                    congestion_path_data_opt_arc
+                                                        .lock()
+                                                        .unwrap()
+                                                        .get_mut(&day)
+                                                        .unwrap()
+                                                        .get_mut(&period)
+                                                        .unwrap()
+                                                        .insert((previous_room.to_owned(), room.to_owned()), 1);
+                                                }
+                                                let contains = congestion_path_data_opt_arc
+                                                    .lock()
+                                                    .unwrap()
+                                                    .get(&day)
+                                                    .unwrap()
+                                                    .get(&period)
+                                                    .unwrap()
+                                                    .contains_key(&(room.to_owned(), previous_room.to_owned()));
+                                                if contains {
+                                                    *congestion_path_data_opt_arc
+                                                        .lock()
+                                                        .unwrap()
+                                                        .get_mut(&day)
+                                                        .unwrap()
+                                                        .get_mut(&period)
+                                                        .unwrap()
+                                                        .get_mut(&(room.to_owned(), previous_room.to_owned()))
+                                                        .unwrap() += 1;
+                                                } else {
+                                                    congestion_path_data_opt_arc
+                                                        .lock()
+                                                        .unwrap()
+                                                        .get_mut(&day)
+                                                        .unwrap()
+                                                        .get_mut(&period)
+                                                        .unwrap()
+                                                        .insert((room.to_owned(), previous_room.to_owned()), 1);
+                                                }
+                                            }
+                                            previous_room = room;
+                                            *congestion_point_data_opt_arc
+                                                .lock()
+                                                .unwrap()
+                                                .get_mut(&day)
+                                                .unwrap()
+                                                .get_mut(&period)
+                                                .unwrap()
+                                                .get_mut(room)
+                                                .unwrap() += 1;
+                                            let cur_max_congestion = *max_congestion_opt_arc.lock().unwrap();
+                                            *max_congestion_opt_arc.lock().unwrap() = cur_max_congestion.max(
+                                                *congestion_point_data_opt_arc
+                                                    .lock()
+                                                    .unwrap()
+                                                    .get_mut(&day)
+                                                    .unwrap()
+                                                    .get_mut(&period)
+                                                    .unwrap()
+                                                    .get_mut(room)
+                                                    .unwrap(),
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                            for day in 1..=5 {
+                                for period in 0..=11 {
+                                    for room in &rooms {
+                                        let room_congestion = *congestion_point_data_opt_arc
+                                            .lock()
+                                            .unwrap()
+                                            .get_mut(&day)
+                                            .unwrap()
+                                            .get_mut(&period)
+                                            .unwrap()
+                                            .get_mut(room)
+                                            .unwrap();
+                                        congestion_statistics_opt_arc
+                                            .lock()
+                                            .unwrap()
+                                            .point_count
+                                            .get_mut(&day)
+                                            .unwrap()
+                                            .get_mut(&period)
+                                            .unwrap()[congestion_range_index(room_congestion)] += 1;
+                                    }
+                                }
+                            }
+                            for day in 1..=5 {
+                                for period in 0..=11 {
+                                    congestion_path_data_opt_arc
+                                    .lock()
+                                    .unwrap()
+                                    .get_mut(&day)
+                                    .unwrap()
+                                    .get_mut(&period)
+                                    .unwrap().iter_mut().for_each(|(_, congestion)| {
+                                        congestion_statistics_opt_arc
+                                            .lock()
+                                            .unwrap()
+                                            .path_count
+                                            .get_mut(&day)
+                                            .unwrap()
+                                            .get_mut(&period)
+                                            .unwrap()[congestion_range_index(*congestion)] += 1;
+                                    });
+                                }
+                            }
+                        }
                         for day in 1..=5 {
                             for period in 0..=11 {
                                 for room in &rooms {
@@ -810,7 +1119,14 @@ impl OptiWayApp {
                                         .unwrap()
                                         .get_mut(room)
                                         .unwrap();
-                                    congestion_statistics_arc.lock().unwrap().point_count.get_mut(&day).unwrap().get_mut(&period).unwrap()[congestion_range_index(room_congestion)] += 1;
+                                    congestion_statistics_arc
+                                        .lock()
+                                        .unwrap()
+                                        .point_count
+                                        .get_mut(&day)
+                                        .unwrap()
+                                        .get_mut(&period)
+                                        .unwrap()[congestion_range_index(room_congestion)] += 1;
                                 }
                             }
                         }
@@ -823,11 +1139,19 @@ impl OptiWayApp {
                                 .unwrap()
                                 .get_mut(&period)
                                 .unwrap().iter_mut().for_each(|(_, congestion)| {
-                                    congestion_statistics_arc.lock().unwrap().path_count.get_mut(&day).unwrap().get_mut(&period).unwrap()[congestion_range_index(*congestion)] += 1;
+                                    congestion_statistics_arc
+                                        .lock()
+                                        .unwrap()
+                                        .path_count
+                                        .get_mut(&day)
+                                        .unwrap()
+                                        .get_mut(&period)
+                                        .unwrap()[congestion_range_index(*congestion)] += 1;
                                 });
                             }
                         }
-                        *congestion_status_arc.lock().unwrap() = CongestionStatus::GeneratingPI(0, "Calculating performance indices".to_owned());
+                        *congestion_status_arc.lock().unwrap() =
+                            CongestionStatus::GeneratingPI(0, "Calculating performance indices".to_owned());
                         let mut performance_indices_shortest = HashMap::new();
                         let path_distances = path_distances_arc.lock().unwrap().clone();
                         for day in 1..=5 {
@@ -1175,7 +1499,9 @@ impl OptiWayApp {
                                 .color(Color32::from_rgb(0x14, 0xae, 0x52)),
                         );
                         ui.label("Validation successful");
-                        ui.label("The timetable has been imported successfully. You may now proceed to the next step.");
+                        ui.label(
+                            "The timetable has been imported successfully. You may now proceed to the next step."
+                        );
                         if ui.button("Close").clicked() {
                             self.show_json_validation = false;
                         }
@@ -1251,7 +1577,7 @@ impl OptiWayApp {
                     self.performance_indices_optimized.lock().unwrap();
                 ui.horizontal(|ui| {
                     if ui
-                        .selectable_label(self.show_pi_shortest, "Shorest Path")
+                        .selectable_label(self.show_pi_shortest, "shortest Path")
                         .clicked()
                     {
                         self.show_pi_shortest = true;
@@ -1287,7 +1613,8 @@ impl OptiWayApp {
                         for index in 0..=11 {
                             ui.label(convert_periods(index));
                             for day in 1..=5 {
-                                if (hightlights[(day - 1) as usize] as usize == index) && optimization_status == OptimizationStatus::Calculating {
+                                if (hightlights[(day - 1) as usize] as usize == index)
+                                    && optimization_status == OptimizationStatus::Calculating {
                                     ui.label(RichText::new(pi_matrix[&day][&index].to_formatted_string(&Locale::fr))
                                         .color(Color32::from_rgb(0xec, 0x6f, 0x27)));
                                 } else {
@@ -1324,7 +1651,9 @@ impl OptiWayApp {
                         .to_formatted_string(&Locale::fr),
                 );
                 ui.separator();
-                ui.label("Performance indices measure the overall performance of the routes. The lower the value, the better the performance.");
+                ui.label(
+                    "Performance indices measure the overall performance of the routes. The lower the value, the better the performance."
+                );
             });
     }
 }
@@ -1569,7 +1898,7 @@ impl eframe::App for OptiWayApp {
                         .on_hover_text("No student selected.");
                     ui.separator();
                 }
-                if self.student_routes.lock().unwrap().is_none() {
+                if self.student_routes_shortest.lock().unwrap().is_none() {
                     ui.label(material_design_icons::MDI_SIGN_DIRECTION_REMOVE)
                         .on_hover_text("Path not calculated.");
                     ui.separator();
@@ -1660,6 +1989,22 @@ impl eframe::App for OptiWayApp {
                         },
                     );
                     ui.separator();
+                    ComboBox::from_label("Route display mode")
+                        .selected_text(format!("{}", self.path_display))
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(
+                                &mut self.path_display,
+                                PathDisplay::Shortest,
+                                "Shortest route",
+                            );
+                            ui.add_enabled_ui(self.student_routes_optimized.lock().unwrap().is_some(), |ui| {
+                                ui.selectable_value(
+                                    &mut self.path_display,
+                                    PathDisplay::Optimized,
+                                    "Optimized route",
+                                );
+                            });
+                        });
                     ComboBox::from_label("Student")
                         .selected_text(self.selected_student.clone().unwrap_or("—".to_owned()))
                         .show_ui(ui, |ui| {
@@ -1713,12 +2058,35 @@ impl eframe::App for OptiWayApp {
                     }
                     ui.separator();
                     ui.heading("Export");
-                    if ui.button("Export path (all students)").clicked() {
-                        todo!();
+                    if ui.button("Export shortest routes").clicked() {
+                        let file = FileDialog::new()
+                            .add_filter("JSON", &["json"])
+                            .set_directory("../")
+                            .save_file();
+                        if let Some(file) = file {
+                            let mut file = File::create(file).unwrap();
+                            let student_routes = self.student_routes_shortest.lock().unwrap();
+                            let student_routes = student_routes.as_ref().unwrap();
+                            let json = serde_json::to_string_pretty(&student_routes).unwrap();
+                            file.write_all(json.as_bytes()).unwrap();
+                        }
                     }
-                    if ui.button("Export path (current student)").clicked() {
-                        todo!();
-                    }
+                    let enabled = self.student_routes_optimized.lock().unwrap().is_some();
+                    ui.add_enabled_ui(enabled, |ui| {
+                        if ui.button("Export optimized routes").clicked() {
+                            let file = FileDialog::new()
+                                .add_filter("JSON", &["json"])
+                                .set_directory("../")
+                                .save_file();
+                            if let Some(file) = file {
+                                let mut file = File::create(file).unwrap();
+                                let student_routes = self.student_routes_optimized.lock().unwrap();
+                                let student_routes = student_routes.as_ref().unwrap();
+                                let json = serde_json::to_string_pretty(&student_routes).unwrap();
+                                file.write_all(json.as_bytes()).unwrap();
+                            }
+                        }
+                    });
                     ui.separator();
                     ui.heading("Floor view");
                     ui.horizontal(|ui| {
@@ -1865,7 +2233,11 @@ impl eframe::App for OptiWayApp {
 
             let path_list: Vec<String> = if self.selected_student.is_some() {
                 let student_number = self.selected_student.clone().unwrap();
-                let student_routes = self.student_routes.lock().unwrap().clone();
+                let student_routes = if self.path_display == PathDisplay::Optimized {
+                    self.student_routes_optimized.lock().unwrap().clone()
+                } else {
+                    self.student_routes_shortest.lock().unwrap().clone()
+                };
                 if let Some(student_routes) = student_routes {
                     student_routes[&student_number][&self.selected_day][&self.selected_period]
                         .split(' ')
@@ -1982,58 +2354,118 @@ impl eframe::App for OptiWayApp {
                 }
             } else {
                 if self.show_congestion_path {
-                    for ((node1, node2), congestion) in self
-                        .congestion_path_data
-                        .lock()
-                        .unwrap()
-                        .clone()
-                        .get(&self.selected_day)
-                        .unwrap()
-                        .get(&self.selected_period)
-                        .unwrap()
-                    {
-                        if node1 == "G" || node2 == "G" || congestion < &self.congestion_filter {
-                            continue;
-                        }
-                        let node1_pos = self.projection_coords[node1];
-                        let node2_pos = self.projection_coords[node2];
-                        if self.selected_floor_index == 0
-                            || (current_floor_z >= node1_pos[2].min(node2_pos[2])
-                                && current_floor_z <= node1_pos[2].max(node2_pos[2]))
+                    if self.path_display == PathDisplay::Optimized
+                        && self.student_routes_optimized.lock().unwrap().is_some() {
+                        for ((node1, node2), congestion) in self
+                            .congestion_path_data_opt
+                            .lock()
+                            .unwrap()
+                            .clone()
+                            .get(&self.selected_day)
+                            .unwrap()
+                            .get(&self.selected_period)
+                            .unwrap()
                         {
-                            ui.painter().line_segment(
-                                [
-                                    convert_pos(&rect, &node1_pos, scale),
-                                    convert_pos(&rect, &node2_pos, scale),
-                                ],
-                                Stroke::new(4.0, congestion_color_scale(*congestion)),
-                            );
+                            if node1 == "G" || node2 == "G" || congestion < &self.congestion_filter {
+                                continue;
+                            }
+                            let node1_pos = self.projection_coords[node1];
+                            let node2_pos = self.projection_coords[node2];
+                            if self.selected_floor_index == 0
+                                || (current_floor_z >= node1_pos[2].min(node2_pos[2])
+                                    && current_floor_z <= node1_pos[2].max(node2_pos[2]))
+                            {
+                                ui.painter().line_segment(
+                                    [
+                                        convert_pos(&rect, &node1_pos, scale),
+                                        convert_pos(&rect, &node2_pos, scale),
+                                    ],
+                                    Stroke::new(4.0, congestion_color_scale(*congestion)),
+                                );
+                            }
+                        }
+                    } else {
+                        for ((node1, node2), congestion) in self
+                            .congestion_path_data
+                            .lock()
+                            .unwrap()
+                            .clone()
+                            .get(&self.selected_day)
+                            .unwrap()
+                            .get(&self.selected_period)
+                            .unwrap()
+                        {
+                            if node1 == "G" || node2 == "G" || congestion < &self.congestion_filter {
+                                continue;
+                            }
+                            let node1_pos = self.projection_coords[node1];
+                            let node2_pos = self.projection_coords[node2];
+                            if self.selected_floor_index == 0
+                                || (current_floor_z >= node1_pos[2].min(node2_pos[2])
+                                    && current_floor_z <= node1_pos[2].max(node2_pos[2]))
+                            {
+                                ui.painter().line_segment(
+                                    [
+                                        convert_pos(&rect, &node1_pos, scale),
+                                        convert_pos(&rect, &node2_pos, scale),
+                                    ],
+                                    Stroke::new(4.0, congestion_color_scale(*congestion)),
+                                );
+                            }
                         }
                     }
                 }
                 if self.show_congestion_point {
-                    for (room, congestion) in self
-                        .congestion_point_data
-                        .lock()
-                        .unwrap()
-                        .clone()
-                        .get(&self.selected_day)
-                        .unwrap()
-                        .get(&self.selected_period)
-                        .unwrap()
-                    {
-                        if room == "G" || room.is_empty() {
-                            continue;
-                        }
-                        let coords = self.projection_coords.get(room).unwrap();
-                        if (self.selected_floor_index == 0 || (current_floor_z == coords[2]))
-                            && *congestion >= self.congestion_filter
+                    if self.path_display == PathDisplay::Optimized
+                        && self.student_routes_optimized.lock().unwrap().is_some() {
+                        for (room, congestion) in self
+                            .congestion_point_data
+                            .lock()
+                            .unwrap()
+                            .clone()
+                            .get(&self.selected_day)
+                            .unwrap()
+                            .get(&self.selected_period)
+                            .unwrap()
                         {
-                            ui.painter().circle_filled(
-                                convert_pos(&rect, coords, scale),
-                                4.0,
-                                congestion_color_scale(*congestion),
-                            );
+                            if room == "G" || room.is_empty() {
+                                continue;
+                            }
+                            let coords = self.projection_coords.get(room).unwrap();
+                            if (self.selected_floor_index == 0 || (current_floor_z == coords[2]))
+                                && *congestion >= self.congestion_filter
+                            {
+                                ui.painter().circle_filled(
+                                    convert_pos(&rect, coords, scale),
+                                    4.0,
+                                    congestion_color_scale(*congestion),
+                                );
+                            }
+                        }
+                    } else {
+                        for (room, congestion) in self
+                            .congestion_point_data_opt
+                            .lock()
+                            .unwrap()
+                            .clone()
+                            .get(&self.selected_day)
+                            .unwrap()
+                            .get(&self.selected_period)
+                            .unwrap()
+                        {
+                            if room == "G" || room.is_empty() {
+                                continue;
+                            }
+                            let coords = self.projection_coords.get(room).unwrap();
+                            if (self.selected_floor_index == 0 || (current_floor_z == coords[2]))
+                                && *congestion >= self.congestion_filter
+                            {
+                                ui.painter().circle_filled(
+                                    convert_pos(&rect, coords, scale),
+                                    4.0,
+                                    congestion_color_scale(*congestion),
+                                );
+                            }
                         }
                     }
                 }

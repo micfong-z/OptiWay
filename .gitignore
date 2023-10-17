@@ -5,4 +5,5 @@ optiway/target
 *.out
 multi_agent_path_finding/output
 **/routes.json
+optiway/bin
 .idea
