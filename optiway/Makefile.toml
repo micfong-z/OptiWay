@@ -12,6 +12,14 @@ args = ["../multi_agent_path_finding/floyd.cpp", "-o", "bin/floyd.out", "-std=c+
 command = "${G_PLUS_PLUS}"
 args = ["../multi_agent_path_finding/floyd.cpp", "-o", "bin/floyd.out", "-std=c++17", "-O3", "-Xlinker", "-ld_classic"]
 
+[tasks.optimization-build]
+command = "${G_PLUS_PLUS}"
+args = ["../multi_agent_path_finding/multi-objective-agent.cpp", "-o", "bin/optimization.out", "-std=c++17", "-O0", "-Xlinker", "-ld_classic"]
+
+[tasks.optimization-release-build]
+command = "${G_PLUS_PLUS}"
+args = ["../multi_agent_path_finding/multi-objective-agent.cpp", "-o", "bin/optimization.out", "-std=c++17", "-O3", "-Xlinker", "-ld_classic"]
+
 [tasks.entry-run]
 command = "cargo"
 args = ["run"]
@@ -31,17 +39,20 @@ args = ["run", "--release"]
 [tasks.run]
 dependencies = [
     "floyd-build",
+    "optimization-build",
     "entry-run",
 ]
 
 [tasks.build]
 dependencies = [
     "floyd-build",
+    "optimization-build",
     "entry-build",
 ]
 
 [tasks.release]
 dependencies = [
     "floyd-release-build",
+    "optimization-release-build",
     "entry-release-run",
 ]

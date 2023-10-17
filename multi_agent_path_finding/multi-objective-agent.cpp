@@ -444,7 +444,7 @@ void iterSingleDay(const int day, json& route_tables, const Graph& graph) {
         sum_rperf_copy[period] = sum_rperf[period];
         prev_best_rperf[period] = sum_rperf[period];
 
-        cout << "PERIOD " << period << " INITIAL PERFORMANCE: " << sum_rperf[period] << endl;
+        // cout << "PERIOD " << period << " INITIAL PERFORMANCE: " << sum_rperf[period] << endl;
     }
 
     string last_start[15], last_end[15];
@@ -456,8 +456,9 @@ void iterSingleDay(const int day, json& route_tables, const Graph& graph) {
             iter(paths[period], sum_rperf[period], congestions[period], graph, last_start[period], last_end[period], temp[period]);
             prev_best_rperf[period] = min(sum_rperf[period], prev_best_rperf[period]);
 
-            if (i % BATCH_SIZE | i == 0) cout << fixed << setprecision(0) << "0 " << i << ' ' << day << ' ' << period << ' ' << sum_rperf[period] << ' ' << prev_best_rperf[period] << endl;
-            else {
+            if (i % BATCH_SIZE | i == 0) {
+                // cout << fixed << setprecision(0) << "0 " << i << ' ' << day << ' ' << period << ' ' << sum_rperf[period] << ' ' << prev_best_rperf[period] << endl;
+            } else {
                 for (const auto& [node, edges] : graph) {
                     for (const auto& edge : edges) {
                         congestions[period][node+edge.dest] = 0;
@@ -501,7 +502,7 @@ void iterSingleDay(const int day, json& route_tables, const Graph& graph) {
                     sum_rperf_copy[period] = sum_rperf[period];
                 }
 
-                cout << fixed << setprecision(0) << "1 " << i << ' ' << day << ' ' << period << ' ' << sum_rperf[period] << ' ' << prev_best_rperf[period] << endl;
+                cout << fixed << setprecision(0) << "0 " << i << ' ' << day << ' ' << period << ' ' << sum_rperf[period] << ' ' << prev_best_rperf[period] << endl;
             }
 
             if (! (i % ITER_SAVE_STEPS) && period == 0 && i) {  // for every 500 iterations dump the json file
@@ -525,12 +526,15 @@ void iterSingleDay(const int day, json& route_tables, const Graph& graph) {
 
                 ofstream iter_output_file(ROUTE_FILE_PATH);
                 if (iter_output_file.is_open()) {
-                    iter_output_file << iter_output.dump(4); // 4 spaces for indentation
+                    iter_output_file << iter_output.dump(); // minimize size
                     iter_output_file.close();
-                    cout << "JSON data written to routes.json successfully." << endl;
+                    // cout << "JSON data written to routes.json successfully." << endl;
+                    cout << fixed << setprecision(0) << "1 " << i << ' ' << day << ' ' << period << ' ' << sum_rperf[period] << ' ' << prev_best_rperf[period] << endl;
                 } else {
-                    cerr << "Failed to open the file for writing." << endl;
+                    // cerr << "Failed to open the file for writing." << endl;
+                    cout << fixed << setprecision(0) << "! " << i << ' ' << day << ' ' << period << ' ' << sum_rperf[period] << ' ' << prev_best_rperf[period] << endl;
                 }
+                
             }
         }
     }
