@@ -1,23 +1,38 @@
 use std::{
     collections::HashMap,
     f32::consts::PI,
-    fs::{self, File},
-    io::{BufRead, Read, Write, BufReader},
-    path::{Path, PathBuf},
-    process::{Command, Stdio},
-    sync::{Arc, Mutex},
-    thread, fmt::Display,
+    fmt::Display,
+    fs::{ self, File },
+    io::{ BufRead, BufReader, Read, Write },
+    path::{ Path, PathBuf },
+    process::{ Command, Stdio },
+    sync::{ Arc, Mutex },
+    thread,
 };
 
 use egui::{
-    color_picker, emath, pos2, CentralPanel, Color32, ColorImage, ComboBox, Grid, Layout,
-    ProgressBar, Rect, RichText, Slider, Stroke, TextureHandle, Window,
+    color_picker,
+    emath,
+    pos2,
+    CentralPanel,
+    Color32,
+    ColorImage,
+    ComboBox,
+    Grid,
+    Layout,
+    ProgressBar,
+    Rect,
+    RichText,
+    Slider,
+    Stroke,
+    TextureHandle,
+    Window,
 };
-use signal_child::Signalable;
-use num_format::{Locale, ToFormattedString};
+use num_format::{ Locale, ToFormattedString };
 use rfd::FileDialog;
+use signal_child::Signalable;
 
-use crate::{md_icons::material_design_icons, setup_custom_fonts, setup_custom_styles};
+use crate::{ md_icons::material_design_icons, setup_custom_fonts, setup_custom_styles };
 
 #[derive(Default, Clone, PartialEq, Eq)]
 enum PathDisplay {
@@ -156,7 +171,10 @@ impl Default for CongestionStatistics {
                 for day in 1..=5 {
                     path_count.insert(day, HashMap::new());
                     for period in 0..=11 {
-                        path_count.get_mut(&day).unwrap().insert(period, vec![0; 7]);
+                        path_count
+                            .get_mut(&day)
+                            .unwrap()
+                            .insert(period, vec![0; 7]);
                     }
                 }
                 path_count
@@ -234,12 +252,14 @@ impl Default for OptiWayApp {
             selected_floor_index: 0,
             textures: vec![None; 9],
             inactive_brightness: 64,
-            projection_coords: serde_yaml::from_str(
-                std::fs::read_to_string("../assets/projection-coords-flatten.yaml")
-                    .expect("Failed to read projection-coords-flatten.yaml")
-                    .as_str(),
-            )
-            .unwrap(),
+            projection_coords: serde_yaml
+                ::from_str(
+                    std::fs
+                        ::read_to_string("../assets/projection-coords-flatten.yaml")
+                        .expect("Failed to read projection-coords-flatten.yaml")
+                        .as_str()
+                )
+                .unwrap(),
             active_path_color: Color32::from_rgb(0xec, 0x6f, 0x27),
             inactive_path_color: Color32::from_gray(0x61),
             show_path_window: false,
@@ -253,58 +273,54 @@ impl Default for OptiWayApp {
             show_timetable_window: false,
             show_congestion_window: false,
             congestion_status: Default::default(),
-            congestion_point_data: Arc::new(Mutex::new({
-                let mut congestion_data = CongestionPoint::new();
-                for day in 1..=5 {
-                    congestion_data.insert(day, HashMap::new());
-                    for period in 0..=11 {
-                        congestion_data
-                            .get_mut(&day)
-                            .unwrap()
-                            .insert(period, HashMap::new());
+            congestion_point_data: Arc::new(
+                Mutex::new({
+                    let mut congestion_data = CongestionPoint::new();
+                    for day in 1..=5 {
+                        congestion_data.insert(day, HashMap::new());
+                        for period in 0..=11 {
+                            congestion_data.get_mut(&day).unwrap().insert(period, HashMap::new());
+                        }
                     }
-                }
-                congestion_data
-            })),
-            congestion_path_data: Arc::new(Mutex::new({
-                let mut congestion_data = CongestionPath::new();
-                for day in 1..=5 {
-                    congestion_data.insert(day, HashMap::new());
-                    for period in 0..=11 {
-                        congestion_data
-                            .get_mut(&day)
-                            .unwrap()
-                            .insert(period, HashMap::new());
+                    congestion_data
+                })
+            ),
+            congestion_path_data: Arc::new(
+                Mutex::new({
+                    let mut congestion_data = CongestionPath::new();
+                    for day in 1..=5 {
+                        congestion_data.insert(day, HashMap::new());
+                        for period in 0..=11 {
+                            congestion_data.get_mut(&day).unwrap().insert(period, HashMap::new());
+                        }
                     }
-                }
-                congestion_data
-            })),
-            congestion_point_data_opt: Arc::new(Mutex::new({
-                let mut congestion_data = CongestionPoint::new();
-                for day in 1..=5 {
-                    congestion_data.insert(day, HashMap::new());
-                    for period in 0..=11 {
-                        congestion_data
-                            .get_mut(&day)
-                            .unwrap()
-                            .insert(period, HashMap::new());
+                    congestion_data
+                })
+            ),
+            congestion_point_data_opt: Arc::new(
+                Mutex::new({
+                    let mut congestion_data = CongestionPoint::new();
+                    for day in 1..=5 {
+                        congestion_data.insert(day, HashMap::new());
+                        for period in 0..=11 {
+                            congestion_data.get_mut(&day).unwrap().insert(period, HashMap::new());
+                        }
                     }
-                }
-                congestion_data
-            })),
-            congestion_path_data_opt: Arc::new(Mutex::new({
-                let mut congestion_data = CongestionPath::new();
-                for day in 1..=5 {
-                    congestion_data.insert(day, HashMap::new());
-                    for period in 0..=11 {
-                        congestion_data
-                            .get_mut(&day)
-                            .unwrap()
-                            .insert(period, HashMap::new());
+                    congestion_data
+                })
+            ),
+            congestion_path_data_opt: Arc::new(
+                Mutex::new({
+                    let mut congestion_data = CongestionPath::new();
+                    for day in 1..=5 {
+                        congestion_data.insert(day, HashMap::new());
+                        for period in 0..=11 {
+                            congestion_data.get_mut(&day).unwrap().insert(period, HashMap::new());
+                        }
                     }
-                }
-                congestion_data
-            })),
+                    congestion_data
+                })
+            ),
             congestion_statistics: Default::default(),
             congestion_statistics_opt: Default::default(),
             maximum_congestion: Default::default(),
@@ -314,10 +330,11 @@ impl Default for OptiWayApp {
             show_congestion_path: true,
             show_congestion_point: true,
             show_pi_window: false,
-            shortest_paths_json: serde_json::from_reader::<_, HashMap<String, String>>(
-                File::open("./assets/shortest_paths.json").unwrap(),
-            )
-            .unwrap(),
+            shortest_paths_json: serde_json
+                ::from_reader::<_, HashMap<String, String>>(
+                    File::open("./assets/shortest_paths.json").unwrap()
+                )
+                .unwrap(),
             performance_indices_shortest: {
                 let mut performance_indices = HashMap::new();
                 for day in 1..=5 {
@@ -339,35 +356,31 @@ impl Default for OptiWayApp {
                 Arc::new(Mutex::new(performance_indices))
             },
             show_pi_shortest: true,
-            path_distances: Arc::new(Mutex::new({
-                let mut path_distances = HashMap::new();
-                // read paths.txt in the format [room1] [room2] [distance] [(ignore)]
-                let paths_file = File::open("./assets/paths.txt").unwrap();
-                let paths_file = std::io::BufReader::new(paths_file);
-                for line in paths_file.lines() {
-                    let line = line.unwrap();
-                    let mut line = line.split(' ');
-                    let room1 = line.next().unwrap().to_owned();
-                    let room2 = line.next().unwrap().to_owned();
-                    let distance = line.next().unwrap().parse::<u32>().unwrap();
-                    // insert if not present
-                    if !path_distances.contains_key(&room1) {
-                        path_distances.insert(room1.clone(), HashMap::new());
+            path_distances: Arc::new(
+                Mutex::new({
+                    let mut path_distances = HashMap::new();
+                    // read paths.txt in the format [room1] [room2] [distance] [(ignore)]
+                    let paths_file = File::open("./assets/paths.txt").unwrap();
+                    let paths_file = std::io::BufReader::new(paths_file);
+                    for line in paths_file.lines() {
+                        let line = line.unwrap();
+                        let mut line = line.split(' ');
+                        let room1 = line.next().unwrap().to_owned();
+                        let room2 = line.next().unwrap().to_owned();
+                        let distance = line.next().unwrap().parse::<u32>().unwrap();
+                        // insert if not present
+                        if !path_distances.contains_key(&room1) {
+                            path_distances.insert(room1.clone(), HashMap::new());
+                        }
+                        path_distances.get_mut(&room1).unwrap().insert(room2.clone(), distance);
+                        if !path_distances.contains_key(&room2) {
+                            path_distances.insert(room2.clone(), HashMap::new());
+                        }
+                        path_distances.get_mut(&room2).unwrap().insert(room1, distance);
                     }
                     path_distances
-                        .get_mut(&room1)
-                        .unwrap()
-                        .insert(room2.clone(), distance);
-                    if !path_distances.contains_key(&room2) {
-                        path_distances.insert(room2.clone(), HashMap::new());
-                    }
-                    path_distances
-                        .get_mut(&room2)
-                        .unwrap()
-                        .insert(room1, distance);
-                }
-                path_distances
-            })),
+                })
+            ),
             optimization_status: Default::default(),
             show_optimization_window: false,
             param_batch_size: 100,
@@ -399,43 +412,58 @@ impl OptiWayApp {
     fn show_path_generation_window(
         &mut self,
         ctx: &egui::Context,
-        current_path_status: PathGenerationStatus,
+        current_path_status: PathGenerationStatus
     ) {
         Window::new("Calculating Path").show(ctx, |ui| {
             ui.heading("Metadata");
-            Grid::new("path_generation_grid").num_columns(2).show(ui, |ui| {
-                ui.label("Algorithm");
-                ui.label("Minimize distance");
-                ui.end_row();
+            Grid::new("path_generation_grid")
+                .num_columns(2)
+                .show(ui, |ui| {
+                    ui.label("Algorithm");
+                    ui.label("Minimize distance");
+                    ui.end_row();
 
-                ui.label("Student count");
-                if let Some(student_count) = *self.timetable_file_info.student_count.lock().unwrap() {
-                    ui.label(format!("{}", student_count));
-                } else {
-                    ui.label("—");
-                }
-                ui.end_row();
+                    ui.label("Student count");
+                    if
+                        let Some(student_count) = *self.timetable_file_info.student_count
+                            .lock()
+                            .unwrap()
+                    {
+                        ui.label(format!("{}", student_count));
+                    } else {
+                        ui.label("—");
+                    }
+                    ui.end_row();
 
-                ui.label("Session count");
-                if let Some(session_count) = *self.timetable_file_info.session_count.lock().unwrap() {
-                    ui.label(format!("{}", session_count));
-                } else {
-                    ui.label("—");
-                }
-                ui.end_row();
-            });
+                    ui.label("Session count");
+                    if
+                        let Some(session_count) = *self.timetable_file_info.session_count
+                            .lock()
+                            .unwrap()
+                    {
+                        ui.label(format!("{}", session_count));
+                    } else {
+                        ui.label("—");
+                    }
+                    ui.end_row();
+                });
             ui.separator();
             match current_path_status {
                 PathGenerationStatus::Ready => {
-                    *self.path_generation_status.lock().unwrap() =
-                        PathGenerationStatus::Generating(0, "Calculating path".to_owned());
+                    *self.path_generation_status.lock().unwrap() = PathGenerationStatus::Generating(
+                        0,
+                        "Calculating path".to_owned()
+                    );
                     let filepath = self.timetable_file_info.filepath.clone();
                     let path_generation_status_arc = self.path_generation_status.clone();
                     let student_paths_arc = self.student_routes_shortest.clone();
                     let shortest_paths_content_arc = self.shortest_paths_content.clone();
                     thread::spawn(move || {
-                        *shortest_paths_content_arc.lock().unwrap() =
-                            run_floyd_algorithm_cpp(filepath, path_generation_status_arc, student_paths_arc)
+                        *shortest_paths_content_arc.lock().unwrap() = run_floyd_algorithm_cpp(
+                            filepath,
+                            path_generation_status_arc,
+                            student_paths_arc
+                        );
                     });
                     // let shortest_paths_json = self.shortest_paths_json.clone();
                     // thread::spawn(move || run_floyd_algorithm_rust(filepath, shortest_paths_json, path_generation_status_arc, student_paths_arc));
@@ -452,7 +480,7 @@ impl OptiWayApp {
                         ui.label(
                             RichText::new(material_design_icons::MDI_SIGN_DIRECTION_REMOVE)
                                 .size(32.0)
-                                .color(Color32::from_rgb(0xe4, 0x37, 0x48)),
+                                .color(Color32::from_rgb(0xe4, 0x37, 0x48))
                         );
                         ui.label("Path calculation failed");
                         ui.label(message);
@@ -466,10 +494,12 @@ impl OptiWayApp {
                         ui.label(
                             RichText::new(material_design_icons::MDI_MAP_CHECK)
                                 .size(32.0)
-                                .color(Color32::from_rgb(0x14, 0xae, 0x52)),
+                                .color(Color32::from_rgb(0x14, 0xae, 0x52))
                         );
                         ui.label("Loading paths");
-                        ui.label("The paths have been successfully calculated. OptiWay is now loading the paths.");
+                        ui.label(
+                            "The paths have been successfully calculated. OptiWay is now loading the paths."
+                        );
                         ui.spinner();
                     });
                 }
@@ -478,11 +508,11 @@ impl OptiWayApp {
                         ui.label(
                             RichText::new(material_design_icons::MDI_MAP_CHECK)
                                 .size(32.0)
-                                .color(Color32::from_rgb(0x14, 0xae, 0x52)),
+                                .color(Color32::from_rgb(0x14, 0xae, 0x52))
                         );
                         ui.label("Path calculation successful");
                         ui.label(
-                            "The paths have been successfully calculated and loaded. You may now view or export them.",
+                            "The paths have been successfully calculated and loaded. You may now view or export them."
                         );
                         if ui.button("Close").clicked() {
                             self.show_path_gen_window = false;
@@ -496,7 +526,7 @@ impl OptiWayApp {
     fn show_optimization_window(
         &mut self,
         ctx: &egui::Context,
-        current_optimization_status: OptimizationStatus,
+        current_optimization_status: OptimizationStatus
     ) {
         Window::new("Route Optimization").show(ctx, |ui| {
             match current_optimization_status {
@@ -505,7 +535,7 @@ impl OptiWayApp {
                     ui.add(
                         Slider::new(&mut self.param_batch_size, 10..=200)
                             .step_by(10.0)
-                            .text("Batch size"),
+                            .text("Batch size")
                     );
                     ui.add(
                         Slider::new(&mut self.param_save_every, 100..=5000)
@@ -532,17 +562,24 @@ impl OptiWayApp {
                                     .set_directory("../")
                                     .pick_file();
                                 if let Some(file) = file {
-                                    self.param_filename = file.file_name().unwrap().to_str().unwrap().to_owned();
+                                    self.param_filename = file
+                                        .file_name()
+                                        .unwrap()
+                                        .to_str()
+                                        .unwrap()
+                                        .to_owned();
                                     self.param_filepath = file;
                                 }
                             }
                         });
                         if !self.param_use_shortest_path {
-                            ui.label(if self.param_filename.is_empty() {
-                                "No file selected.".to_owned()
-                            } else {
-                                self.param_filename.clone()
-                            });
+                            ui.label(
+                                if self.param_filename.is_empty() {
+                                    "No file selected.".to_owned()
+                                } else {
+                                    self.param_filename.clone()
+                                }
+                            );
                         }
                     });
                     ui.separator();
@@ -561,7 +598,7 @@ impl OptiWayApp {
                             *self.optimization_status.lock().unwrap() = OptimizationStatus::Ready;
                         }
                     });
-                },
+                }
                 OptimizationStatus::Ready => {
                     *self.optimization_status.lock().unwrap() = OptimizationStatus::Calculating;
                     let param_use_shortest_path = self.param_use_shortest_path;
@@ -573,9 +610,13 @@ impl OptiWayApp {
                         let optimization_status_arc = self.optimization_status.clone();
                         let shortest_paths_content_arc = self.shortest_paths_content.clone();
                         let current_iter_arc = self.current_iter.clone();
-                        let performance_indices_shortest_json = serde_json::to_string(&*self.performance_indices_shortest.lock().unwrap()).unwrap();
-                        let performance_indices_optimized_arc = self.performance_indices_optimized.clone();
-                        let performance_indices_shortest_arc = self.performance_indices_shortest.clone();
+                        let performance_indices_shortest_json = serde_json
+                            ::to_string(&*self.performance_indices_shortest.lock().unwrap())
+                            .unwrap();
+                        let performance_indices_optimized_arc =
+                            self.performance_indices_optimized.clone();
+                        let performance_indices_shortest_arc =
+                            self.performance_indices_shortest.clone();
                         let current_period_iter_arc = self.current_period_iter.clone();
                         if param_use_shortest_path {
                             self.param_filepath = fs::canonicalize("./bin/routes.json").unwrap();
@@ -587,135 +628,170 @@ impl OptiWayApp {
                             file.read_to_string(&mut content).unwrap();
                             let json: MainJSONOutputFile = serde_json::from_str(&content).unwrap();
                             for day in 1..=5 {
-                                *self.current_iter.lock().unwrap().get_mut((day - 1) as usize).unwrap() =
-                                    *json.iter.get((day - 1) as usize).unwrap();
+                                *self.current_iter
+                                    .lock()
+                                    .unwrap()
+                                    .get_mut((day - 1) as usize)
+                                    .unwrap() = *json.iter.get((day - 1) as usize).unwrap();
                             }
                             *self.performance_indices_optimized.lock().unwrap() = json.indices;
                         }
                         thread::spawn(move || {
                             if param_use_shortest_path {
-                                let content = "{\"iter\":[0,0,0,0,0],\"indices\":".to_owned()
-                                    + &performance_indices_shortest_json
-                                    + ",\"routes\":"
-                                    + &shortest_paths_content_arc.lock().unwrap().to_owned()
-                                    + "}";
-                                *performance_indices_optimized_arc.lock().unwrap() = performance_indices_shortest_arc.lock().unwrap().clone();
+                                let content =
+                                    "{\"iter\":[0,0,0,0,0],\"indices\":".to_owned() +
+                                    &performance_indices_shortest_json +
+                                    ",\"routes\":" +
+                                    &shortest_paths_content_arc.lock().unwrap().to_owned() +
+                                    "}";
+                                *performance_indices_optimized_arc.lock().unwrap() =
+                                    performance_indices_shortest_arc.lock().unwrap().clone();
                                 let mut file = File::create("./bin/routes.json").unwrap();
                                 file.write_all(content.as_bytes()).unwrap();
                                 param_filepath = fs::canonicalize("./bin/routes.json").unwrap();
                             }
                             let bin_dir = fs::canonicalize("./bin").unwrap();
-                            if let Ok(mut opt_command) = Command::new("./optimization.out")
-                                .current_dir(bin_dir)
-                                .stdout(Stdio::piped())
-                                .stdin(Stdio::piped())
-                                .args([
-                                    "-f", param_filepath.to_str().unwrap(),
-                                    "-b", &param_batch_size.to_string(),
-                                    "-s", &(param_save_every/5).to_string(),
-                                    "-d", &param_day.to_string(),])
-                                .spawn() {
-                                    if let Some(stdout) = opt_command.stdout.take() {
-                                        let reader = BufReader::new(stdout);
-                                        reader
-                                            .lines()
-                                            .map_while(Result::ok)
-                                            .for_each(|line| {
-                                                let report: Vec<&str> = line.split(' ').collect();
-                                                if report[0] != "1" {
-                                                    (*current_iter_arc.lock().unwrap())[(param_day - 1) as usize] = 
-                                                        report[1].parse::<u64>().unwrap();
-                                                    if optimization_status_arc.lock().unwrap().clone() == 
-                                                        OptimizationStatus::AbortSignal {
-                                                        opt_command
-                                                            .interrupt()
-                                                            .expect("Failed to interrupt optimization algorithm");
-                                                    }
-                                                    (*current_period_iter_arc.lock().unwrap())[(param_day - 1 ) as usize] = report[3].parse::<u64>().unwrap();
-                                                    *performance_indices_optimized_arc
+                            if
+                                let Ok(mut opt_command) = Command::new("./optimization.out")
+                                    .current_dir(bin_dir)
+                                    .stdout(Stdio::piped())
+                                    .stdin(Stdio::piped())
+                                    .args([
+                                        "-f",
+                                        param_filepath.to_str().unwrap(),
+                                        "-b",
+                                        &param_batch_size.to_string(),
+                                        "-s",
+                                        &(param_save_every / 5).to_string(),
+                                        "-d",
+                                        &param_day.to_string(),
+                                    ])
+                                    .spawn()
+                            {
+                                if let Some(stdout) = opt_command.stdout.take() {
+                                    let reader = BufReader::new(stdout);
+                                    reader
+                                        .lines()
+                                        .map_while(Result::ok)
+                                        .for_each(|line| {
+                                            let report: Vec<&str> = line.split(' ').collect();
+                                            if report[0] != "1" {
+                                                (*current_iter_arc.lock().unwrap())[
+                                                    (param_day - 1) as usize
+                                                ] = report[1].parse::<u64>().unwrap();
+                                                if
+                                                    optimization_status_arc
                                                         .lock()
                                                         .unwrap()
-                                                        .get_mut(&param_day)
-                                                        .unwrap()
-                                                        .get_mut(&(report[3].parse::<u64>().unwrap() as usize))
-                                                        .unwrap() = 
-                                                            report[4].parse::<u128>().unwrap();
+                                                        .clone() == OptimizationStatus::AbortSignal
+                                                {
+                                                    opt_command
+                                                        .interrupt()
+                                                        .expect(
+                                                            "Failed to interrupt optimization algorithm"
+                                                        );
                                                 }
-                                            });
-                                    } else {
-                                        *optimization_status_arc.lock().unwrap() =
-                                            OptimizationStatus::Failed("Optimization algorithm terminated unexpectedly".to_owned());
-                                    }
+                                                (*current_period_iter_arc.lock().unwrap())[
+                                                    (param_day - 1) as usize
+                                                ] = report[3].parse::<u64>().unwrap();
+                                                *performance_indices_optimized_arc
+                                                    .lock()
+                                                    .unwrap()
+                                                    .get_mut(&param_day)
+                                                    .unwrap()
+                                                    .get_mut(
+                                                        &(
+                                                            report[3]
+                                                                .parse::<u64>()
+                                                                .unwrap() as usize
+                                                        )
+                                                    )
+                                                    .unwrap() = report[4].parse::<u128>().unwrap();
+                                            }
+                                        });
+                                } else {
+                                    *optimization_status_arc.lock().unwrap() =
+                                        OptimizationStatus::Failed(
+                                            "Optimization algorithm terminated unexpectedly".to_owned()
+                                        );
+                                }
                             } else {
                                 *optimization_status_arc.lock().unwrap() =
-                                    OptimizationStatus::Failed("Failed to start optimization algorithm".to_owned());
+                                    OptimizationStatus::Failed(
+                                        "Failed to start optimization algorithm".to_owned()
+                                    );
                             }
                         });
                     }
-                },
+                }
                 OptimizationStatus::Calculating => {
                     ui.with_layout(Layout::top_down_justified(egui::Align::Center), |ui| {
                         ui.label(RichText::new(material_design_icons::MDI_COG).size(32.0));
                         ui.label("Optimizing paths");
-                        ui.label(format!("Total Iteration: {}", 
-                            self.current_iter
-                                .lock()
-                                .unwrap()
-                                .iter()
-                                .sum::<u64>()
-                                .to_formatted_string(&Locale::fr)));
+                        ui.label(
+                            format!(
+                                "Total Iteration: {}",
+                                self.current_iter
+                                    .lock()
+                                    .unwrap()
+                                    .iter()
+                                    .sum::<u64>()
+                                    .to_formatted_string(&Locale::fr)
+                            )
+                        );
                         ui.spinner();
                         if ui.button("Pause").clicked() {
-                            *self.optimization_status.lock().unwrap() = OptimizationStatus::AbortSignal;
+                            *self.optimization_status.lock().unwrap() =
+                                OptimizationStatus::AbortSignal;
                             // read from routes.json and load the json
                             let mut file = File::open("./bin/routes.json").unwrap();
                             let mut content = String::new();
                             file.read_to_string(&mut content).unwrap();
-                            let mut json: MainJSONOutputFile = serde_json::from_str(&content).unwrap();
+                            let mut json: MainJSONOutputFile = serde_json
+                                ::from_str(&content)
+                                .unwrap();
                             let mut sub_jsons: [SubJSONOutputFile; 5] = Default::default();
                             for i in 1..=5 {
-                                let mut file = File::open(format!("./bin/routes.json_{}.json", i)).unwrap();
+                                let mut file = File::open(
+                                    format!("./bin/routes.json_{}.json", i)
+                                ).unwrap();
                                 let mut content = String::new();
                                 file.read_to_string(&mut content).unwrap();
                                 sub_jsons[i - 1] = serde_json::from_str(&content).unwrap();
                                 json.iter[i - 1] = sub_jsons[i - 1].iter;
-                                *json
-                                    .indices
-                                    .get_mut(&(i as u32))
-                                    .unwrap() = 
-                                        sub_jsons[i - 1]
-                                            .indices
-                                            .get(&(i as u32))
-                                            .unwrap()
-                                            .clone();
+                                *json.indices.get_mut(&(i as u32)).unwrap() = sub_jsons[
+                                    i - 1
+                                ].indices
+                                    .get(&(i as u32))
+                                    .unwrap()
+                                    .clone();
                                 for student_number in sub_jsons[i - 1].routes.keys() {
-                                    *json
-                                        .routes
+                                    *json.routes
                                         .get_mut(student_number)
                                         .unwrap()
                                         .get_mut(&(i as u32))
-                                        .unwrap() = 
-                                            sub_jsons[i - 1]
-                                                .routes
-                                                .get(student_number)
-                                                .unwrap()
-                                                .get(&(i as u32))
-                                                .unwrap()
-                                                .clone();
+                                        .unwrap() = sub_jsons[i - 1].routes
+                                        .get(student_number)
+                                        .unwrap()
+                                        .get(&(i as u32))
+                                        .unwrap()
+                                        .clone();
                                 }
                             }
                             let mut file = File::create("./bin/routes.json").unwrap();
-                            file.write_all(serde_json::to_string(&json).unwrap().as_bytes()).unwrap();
+                            file.write_all(
+                                serde_json::to_string(&json).unwrap().as_bytes()
+                            ).unwrap();
                             *self.student_routes_optimized.lock().unwrap() = Some(json.routes);
                         }
                     });
-                },
+                }
                 OptimizationStatus::AbortSignal => {
                     ui.with_layout(Layout::top_down_justified(egui::Align::Center), |ui| {
                         ui.label(
                             RichText::new(material_design_icons::MDI_COG_PAUSE)
                                 .size(32.0)
-                                .color(Color32::from_rgb(0xff, 0xc1, 0x07)),
+                                .color(Color32::from_rgb(0xff, 0xc1, 0x07))
                         );
                         ui.label("Optimization paused");
                         ui.label("You may resume optimization at any time.");
@@ -724,16 +800,17 @@ impl OptiWayApp {
                         }
                         if ui.button("Close").clicked() {
                             self.show_optimization_window = false;
-                            *self.optimization_status.lock().unwrap() = OptimizationStatus::ParamInput;
+                            *self.optimization_status.lock().unwrap() =
+                                OptimizationStatus::ParamInput;
                         }
                     });
-                },
+                }
                 OptimizationStatus::Failed(message) => {
                     ui.with_layout(Layout::top_down_justified(egui::Align::Center), |ui| {
                         ui.label(
                             RichText::new(material_design_icons::MDI_COG_OFF)
                                 .size(32.0)
-                                .color(Color32::from_rgb(0xe4, 0x37, 0x48)),
+                                .color(Color32::from_rgb(0xe4, 0x37, 0x48))
                         );
                         ui.label("Route optimization failed");
                         ui.label(message);
@@ -741,7 +818,7 @@ impl OptiWayApp {
                             self.show_optimization_window = false;
                         }
                     });
-                },
+                }
             }
         });
     }
@@ -749,14 +826,16 @@ impl OptiWayApp {
     fn show_congestion_window(
         &mut self,
         ctx: &egui::Context,
-        current_congestion_status: CongestionStatus,
+        current_congestion_status: CongestionStatus
     ) {
         Window::new("Congestion Evaluation").show(ctx, |ui| {
             match current_congestion_status {
                 CongestionStatus::Ready => {
                     *self.maximum_congestion.lock().unwrap() = 0;
-                    *self.congestion_status.lock().unwrap() =
-                        CongestionStatus::Generating(0, "Evaluating congestion".to_owned());
+                    *self.congestion_status.lock().unwrap() = CongestionStatus::Generating(
+                        0,
+                        "Evaluating congestion".to_owned()
+                    );
                     *self.congestion_statistics.lock().unwrap() = Default::default();
                     *self.congestion_point_data.lock().unwrap() = {
                         let mut congestion_data = CongestionPoint::new();
@@ -820,13 +899,19 @@ impl OptiWayApp {
                     let congestion_statistics_arc = self.congestion_statistics.clone();
                     let congestion_statistics_opt_arc = self.congestion_statistics_opt.clone();
                     let path_distances_arc = self.path_distances.clone();
-                    let mut rooms: Vec<String> = self.projection_coords.clone().keys().map(|k| k.to_owned()).collect();
-                    let performance_indices_shortest_arc = self.performance_indices_shortest.clone();
+                    let mut rooms: Vec<String> = self.projection_coords
+                        .clone()
+                        .keys()
+                        .map(|k| k.to_owned())
+                        .collect();
+                    let performance_indices_shortest_arc =
+                        self.performance_indices_shortest.clone();
                     rooms.push("G".to_owned());
                     let student_routes = self.student_routes_shortest.lock().unwrap().clone();
                     if student_routes.is_none() {
-                        *congestion_status_arc.lock().unwrap() =
-                            CongestionStatus::Failed("No path data available".to_owned());
+                        *congestion_status_arc.lock().unwrap() = CongestionStatus::Failed(
+                            "No path data available".to_owned()
+                        );
                         return;
                     }
                     let student_routes = student_routes.unwrap();
@@ -872,7 +957,9 @@ impl OptiWayApp {
                                                     .unwrap()
                                                     .get(&period)
                                                     .unwrap()
-                                                    .contains_key(&(previous_room.to_owned(), room.to_owned()));
+                                                    .contains_key(
+                                                        &(previous_room.to_owned(), room.to_owned())
+                                                    );
                                                 if contains {
                                                     *congestion_path_data_opt_arc
                                                         .lock()
@@ -881,7 +968,12 @@ impl OptiWayApp {
                                                         .unwrap()
                                                         .get_mut(&period)
                                                         .unwrap()
-                                                        .get_mut(&(previous_room.to_owned(), room.to_owned()))
+                                                        .get_mut(
+                                                            &(
+                                                                previous_room.to_owned(),
+                                                                room.to_owned(),
+                                                            )
+                                                        )
                                                         .unwrap() += 1;
                                                 } else {
                                                     congestion_path_data_opt_arc
@@ -891,7 +983,13 @@ impl OptiWayApp {
                                                         .unwrap()
                                                         .get_mut(&period)
                                                         .unwrap()
-                                                        .insert((previous_room.to_owned(), room.to_owned()), 1);
+                                                        .insert(
+                                                            (
+                                                                previous_room.to_owned(),
+                                                                room.to_owned(),
+                                                            ),
+                                                            1
+                                                        );
                                                 }
                                                 let contains = congestion_path_data_opt_arc
                                                     .lock()
@@ -900,7 +998,9 @@ impl OptiWayApp {
                                                     .unwrap()
                                                     .get(&period)
                                                     .unwrap()
-                                                    .contains_key(&(room.to_owned(), previous_room.to_owned()));
+                                                    .contains_key(
+                                                        &(room.to_owned(), previous_room.to_owned())
+                                                    );
                                                 if contains {
                                                     *congestion_path_data_opt_arc
                                                         .lock()
@@ -909,7 +1009,12 @@ impl OptiWayApp {
                                                         .unwrap()
                                                         .get_mut(&period)
                                                         .unwrap()
-                                                        .get_mut(&(room.to_owned(), previous_room.to_owned()))
+                                                        .get_mut(
+                                                            &(
+                                                                room.to_owned(),
+                                                                previous_room.to_owned(),
+                                                            )
+                                                        )
                                                         .unwrap() += 1;
                                                 } else {
                                                     congestion_path_data_opt_arc
@@ -919,7 +1024,13 @@ impl OptiWayApp {
                                                         .unwrap()
                                                         .get_mut(&period)
                                                         .unwrap()
-                                                        .insert((room.to_owned(), previous_room.to_owned()), 1);
+                                                        .insert(
+                                                            (
+                                                                room.to_owned(),
+                                                                previous_room.to_owned(),
+                                                            ),
+                                                            1
+                                                        );
                                                 }
                                             }
                                             previous_room = room;
@@ -932,18 +1043,21 @@ impl OptiWayApp {
                                                 .unwrap()
                                                 .get_mut(room)
                                                 .unwrap() += 1;
-                                            let cur_max_congestion = *max_congestion_opt_arc.lock().unwrap();
-                                            *max_congestion_opt_arc.lock().unwrap() = cur_max_congestion.max(
-                                                *congestion_point_data_opt_arc
-                                                    .lock()
-                                                    .unwrap()
-                                                    .get_mut(&day)
-                                                    .unwrap()
-                                                    .get_mut(&period)
-                                                    .unwrap()
-                                                    .get_mut(room)
-                                                    .unwrap(),
-                                            );
+                                            let cur_max_congestion = *max_congestion_opt_arc
+                                                .lock()
+                                                .unwrap();
+                                            *max_congestion_opt_arc.lock().unwrap() =
+                                                cur_max_congestion.max(
+                                                    *congestion_point_data_opt_arc
+                                                        .lock()
+                                                        .unwrap()
+                                                        .get_mut(&day)
+                                                        .unwrap()
+                                                        .get_mut(&period)
+                                                        .unwrap()
+                                                        .get_mut(room)
+                                                        .unwrap()
+                                                );
                                         }
                                     }
                                 }
@@ -963,8 +1077,7 @@ impl OptiWayApp {
                                         congestion_statistics_opt_arc
                                             .lock()
                                             .unwrap()
-                                            .point_count
-                                            .get_mut(&day)
+                                            .point_count.get_mut(&day)
                                             .unwrap()
                                             .get_mut(&period)
                                             .unwrap()[congestion_range_index(room_congestion)] += 1;
@@ -974,21 +1087,22 @@ impl OptiWayApp {
                             for day in 1..=5 {
                                 for period in 0..=11 {
                                     congestion_path_data_opt_arc
-                                    .lock()
-                                    .unwrap()
-                                    .get_mut(&day)
-                                    .unwrap()
-                                    .get_mut(&period)
-                                    .unwrap().iter_mut().for_each(|(_, congestion)| {
-                                        congestion_statistics_opt_arc
-                                            .lock()
-                                            .unwrap()
-                                            .path_count
-                                            .get_mut(&day)
-                                            .unwrap()
-                                            .get_mut(&period)
-                                            .unwrap()[congestion_range_index(*congestion)] += 1;
-                                    });
+                                        .lock()
+                                        .unwrap()
+                                        .get_mut(&day)
+                                        .unwrap()
+                                        .get_mut(&period)
+                                        .unwrap()
+                                        .iter_mut()
+                                        .for_each(|(_, congestion)| {
+                                            congestion_statistics_opt_arc
+                                                .lock()
+                                                .unwrap()
+                                                .path_count.get_mut(&day)
+                                                .unwrap()
+                                                .get_mut(&period)
+                                                .unwrap()[congestion_range_index(*congestion)] += 1;
+                                        });
                                 }
                             }
                         }
@@ -1031,7 +1145,9 @@ impl OptiWayApp {
                                                 .unwrap()
                                                 .get(&period)
                                                 .unwrap()
-                                                .contains_key(&(previous_room.to_owned(), room.to_owned()));
+                                                .contains_key(
+                                                    &(previous_room.to_owned(), room.to_owned())
+                                                );
                                             if contains {
                                                 *congestion_path_data_arc
                                                     .lock()
@@ -1040,7 +1156,9 @@ impl OptiWayApp {
                                                     .unwrap()
                                                     .get_mut(&period)
                                                     .unwrap()
-                                                    .get_mut(&(previous_room.to_owned(), room.to_owned()))
+                                                    .get_mut(
+                                                        &(previous_room.to_owned(), room.to_owned())
+                                                    )
                                                     .unwrap() += 1;
                                             } else {
                                                 congestion_path_data_arc
@@ -1050,7 +1168,10 @@ impl OptiWayApp {
                                                     .unwrap()
                                                     .get_mut(&period)
                                                     .unwrap()
-                                                    .insert((previous_room.to_owned(), room.to_owned()), 1);
+                                                    .insert(
+                                                        (previous_room.to_owned(), room.to_owned()),
+                                                        1
+                                                    );
                                             }
                                             let contains = congestion_path_data_arc
                                                 .lock()
@@ -1059,7 +1180,9 @@ impl OptiWayApp {
                                                 .unwrap()
                                                 .get(&period)
                                                 .unwrap()
-                                                .contains_key(&(room.to_owned(), previous_room.to_owned()));
+                                                .contains_key(
+                                                    &(room.to_owned(), previous_room.to_owned())
+                                                );
                                             if contains {
                                                 *congestion_path_data_arc
                                                     .lock()
@@ -1068,7 +1191,9 @@ impl OptiWayApp {
                                                     .unwrap()
                                                     .get_mut(&period)
                                                     .unwrap()
-                                                    .get_mut(&(room.to_owned(), previous_room.to_owned()))
+                                                    .get_mut(
+                                                        &(room.to_owned(), previous_room.to_owned())
+                                                    )
                                                     .unwrap() += 1;
                                             } else {
                                                 congestion_path_data_arc
@@ -1078,7 +1203,10 @@ impl OptiWayApp {
                                                     .unwrap()
                                                     .get_mut(&period)
                                                     .unwrap()
-                                                    .insert((room.to_owned(), previous_room.to_owned()), 1);
+                                                    .insert(
+                                                        (room.to_owned(), previous_room.to_owned()),
+                                                        1
+                                                    );
                                             }
                                         }
                                         previous_room = room;
@@ -1091,18 +1219,21 @@ impl OptiWayApp {
                                             .unwrap()
                                             .get_mut(room)
                                             .unwrap() += 1;
-                                        let cur_max_congestion = *max_congestion_arc.lock().unwrap();
-                                        *max_congestion_arc.lock().unwrap() = cur_max_congestion.max(
-                                            *congestion_point_data_arc
-                                                .lock()
-                                                .unwrap()
-                                                .get_mut(&day)
-                                                .unwrap()
-                                                .get_mut(&period)
-                                                .unwrap()
-                                                .get_mut(room)
-                                                .unwrap(),
-                                        );
+                                        let cur_max_congestion = *max_congestion_arc
+                                            .lock()
+                                            .unwrap();
+                                        *max_congestion_arc.lock().unwrap() =
+                                            cur_max_congestion.max(
+                                                *congestion_point_data_arc
+                                                    .lock()
+                                                    .unwrap()
+                                                    .get_mut(&day)
+                                                    .unwrap()
+                                                    .get_mut(&period)
+                                                    .unwrap()
+                                                    .get_mut(room)
+                                                    .unwrap()
+                                            );
                                     }
                                 }
                             }
@@ -1122,8 +1253,7 @@ impl OptiWayApp {
                                     congestion_statistics_arc
                                         .lock()
                                         .unwrap()
-                                        .point_count
-                                        .get_mut(&day)
+                                        .point_count.get_mut(&day)
                                         .unwrap()
                                         .get_mut(&period)
                                         .unwrap()[congestion_range_index(room_congestion)] += 1;
@@ -1133,25 +1263,28 @@ impl OptiWayApp {
                         for day in 1..=5 {
                             for period in 0..=11 {
                                 congestion_path_data_arc
-                                .lock()
-                                .unwrap()
-                                .get_mut(&day)
-                                .unwrap()
-                                .get_mut(&period)
-                                .unwrap().iter_mut().for_each(|(_, congestion)| {
-                                    congestion_statistics_arc
-                                        .lock()
-                                        .unwrap()
-                                        .path_count
-                                        .get_mut(&day)
-                                        .unwrap()
-                                        .get_mut(&period)
-                                        .unwrap()[congestion_range_index(*congestion)] += 1;
-                                });
+                                    .lock()
+                                    .unwrap()
+                                    .get_mut(&day)
+                                    .unwrap()
+                                    .get_mut(&period)
+                                    .unwrap()
+                                    .iter_mut()
+                                    .for_each(|(_, congestion)| {
+                                        congestion_statistics_arc
+                                            .lock()
+                                            .unwrap()
+                                            .path_count.get_mut(&day)
+                                            .unwrap()
+                                            .get_mut(&period)
+                                            .unwrap()[congestion_range_index(*congestion)] += 1;
+                                    });
                             }
                         }
-                        *congestion_status_arc.lock().unwrap() =
-                            CongestionStatus::GeneratingPI(0, "Calculating performance indices".to_owned());
+                        *congestion_status_arc.lock().unwrap() = CongestionStatus::GeneratingPI(
+                            0,
+                            "Calculating performance indices".to_owned()
+                        );
                         let mut performance_indices_shortest = HashMap::new();
                         let path_distances = path_distances_arc.lock().unwrap().clone();
                         for day in 1..=5 {
@@ -1179,13 +1312,16 @@ impl OptiWayApp {
                                                 .unwrap()
                                                 .get(room)
                                                 .unwrap_or_else(|| {
-                                                    println!("{:?}", path_distances
-                                                        .get(previous_room)
-                                                        .unwrap());
+                                                    println!(
+                                                        "{:?}",
+                                                        path_distances.get(previous_room).unwrap()
+                                                    );
                                                     panic!(
-                                                    "Path distance not found: {} -> {}",
-                                                    previous_room, room
-                                                )}) as f64;
+                                                        "Path distance not found: {} -> {}",
+                                                        previous_room,
+                                                        room
+                                                    )
+                                                }) as f64;
                                             let path_congestion = *congestion_path_data_arc
                                                 .lock()
                                                 .unwrap()
@@ -1195,16 +1331,22 @@ impl OptiWayApp {
                                                 .unwrap()
                                                 .get(&(previous_room.to_owned(), room.to_owned()))
                                                 .unwrap() as f64;
-                                            index += path_distance * (2.0 + ((path_congestion - 300.0) / 200.0).tanh());
+                                            index +=
+                                                path_distance *
+                                                (2.0 + ((path_congestion - 300.0) / 200.0).tanh());
                                         }
                                         previous_room = room;
                                     }
                                 }
-                                performance_indices_shortest.get_mut(&day).unwrap().insert(period, index as u128);    
+                                performance_indices_shortest
+                                    .get_mut(&day)
+                                    .unwrap()
+                                    .insert(period, index as u128);
                             }
                         }
                         // println!("{}", serde_json::to_string(&performance_indices_shortest).unwrap());
-                        *performance_indices_shortest_arc.lock().unwrap() = performance_indices_shortest;
+                        *performance_indices_shortest_arc.lock().unwrap() =
+                            performance_indices_shortest;
                         *congestion_status_arc.lock().unwrap() = CongestionStatus::Successful;
                     });
                 }
@@ -1214,11 +1356,11 @@ impl OptiWayApp {
                         ui.label(message);
                         ui.spinner();
                     });
-                },
+                }
                 CongestionStatus::Generating(_, message) => {
                     ui.with_layout(Layout::top_down_justified(egui::Align::Center), |ui| {
                         ui.label(
-                            RichText::new(material_design_icons::MDI_TRAFFIC_LIGHT).size(32.0),
+                            RichText::new(material_design_icons::MDI_TRAFFIC_LIGHT).size(32.0)
                         );
                         ui.label(message);
                         ui.spinner();
@@ -1229,7 +1371,7 @@ impl OptiWayApp {
                         ui.label(
                             RichText::new(material_design_icons::MDI_TRAFFIC_LIGHT)
                                 .size(32.0)
-                                .color(Color32::from_rgb(0xe4, 0x37, 0x48)),
+                                .color(Color32::from_rgb(0xe4, 0x37, 0x48))
                         );
                         ui.label("Congestion evaluation failed");
                         ui.label(message);
@@ -1243,13 +1385,18 @@ impl OptiWayApp {
                         ui.label(
                             RichText::new(material_design_icons::MDI_TRAFFIC_LIGHT)
                                 .size(32.0)
-                                .color(Color32::from_rgb(0x14, 0xae, 0x52)),
+                                .color(Color32::from_rgb(0x14, 0xae, 0x52))
                         );
                         ui.label("Congestion evaluation successful");
                         ui.label(
-                            "The congestion has been successfully evaluated and loaded. You may now view them on the projection.",
+                            "The congestion has been successfully evaluated and loaded. You may now view them on the projection."
                         );
-                        ui.label(format!("Maximum congestion: {}", self.maximum_congestion.lock().unwrap()));
+                        ui.label(
+                            format!(
+                                "Maximum congestion: {}",
+                                self.maximum_congestion.lock().unwrap()
+                            )
+                        );
                         if ui.button("Close").clicked() {
                             self.show_congestion_window = false;
                         }
@@ -1262,31 +1409,41 @@ impl OptiWayApp {
     fn show_json_validation_window(
         &mut self,
         ctx: &egui::Context,
-        current_validation_status: TimetableValidationStatus,
+        current_validation_status: TimetableValidationStatus
     ) {
         Window::new("Timetable Validation").show(ctx, |ui| {
             ui.heading("Metadata");
-            Grid::new("timetable_validation_grid").num_columns(2).show(ui, |ui| {
-                ui.label("Filename");
-                ui.label(self.timetable_file_info.filename.to_string());
-                ui.end_row();
+            Grid::new("timetable_validation_grid")
+                .num_columns(2)
+                .show(ui, |ui| {
+                    ui.label("Filename");
+                    ui.label(self.timetable_file_info.filename.to_string());
+                    ui.end_row();
 
-                ui.label("Student count");
-                if let Some(student_count) = *self.timetable_file_info.student_count.lock().unwrap() {
-                    ui.label(format!("{}", student_count));
-                } else {
-                    ui.label("—");
-                }
-                ui.end_row();
+                    ui.label("Student count");
+                    if
+                        let Some(student_count) = *self.timetable_file_info.student_count
+                            .lock()
+                            .unwrap()
+                    {
+                        ui.label(format!("{}", student_count));
+                    } else {
+                        ui.label("—");
+                    }
+                    ui.end_row();
 
-                ui.label("Session count");
-                if let Some(session_count) = *self.timetable_file_info.session_count.lock().unwrap() {
-                    ui.label(format!("{}", session_count));
-                } else {
-                    ui.label("—");
-                }
-                ui.end_row();
-            });
+                    ui.label("Session count");
+                    if
+                        let Some(session_count) = *self.timetable_file_info.session_count
+                            .lock()
+                            .unwrap()
+                    {
+                        ui.label(format!("{}", session_count));
+                    } else {
+                        ui.label("—");
+                    }
+                    ui.end_row();
+                });
             ui.separator();
             match current_validation_status {
                 TimetableValidationStatus::Ready => {
@@ -1300,181 +1457,244 @@ impl OptiWayApp {
                     let timetable_arc = self.timetable_file_info.timetable.clone();
                     let student_list_arc = self.student_list.clone();
                     thread::spawn(move || {
-                        let mut rooms: Vec<String> = projection_coords.keys().map(|k| k.to_owned()).collect();
+                        let mut rooms: Vec<String> = projection_coords
+                            .keys()
+                            .map(|k| k.to_owned())
+                            .collect();
                         *validation_status_arc.lock().unwrap() =
-                            TimetableValidationStatus::Validating(0, "Validating student numbers...".to_owned());
+                            TimetableValidationStatus::Validating(
+                                0,
+                                "Validating student numbers...".to_owned()
+                            );
                         rooms.push("G".into());
                         let mut timetable_file = std::fs::File::open(filepath).unwrap();
                         let mut timetable_json = String::new();
                         if timetable_file.read_to_string(&mut timetable_json).is_err() {
                             *validation_status_arc.lock().unwrap() =
-                                TimetableValidationStatus::Failed("Failed to read timetable file".to_owned());
+                                TimetableValidationStatus::Failed(
+                                    "Failed to read timetable file".to_owned()
+                                );
                             return;
-                        };
-                        let timetable: serde_json::Value = match serde_json::from_str(&timetable_json) {
+                        }
+                        let timetable: serde_json::Value = match
+                            serde_json::from_str(&timetable_json)
+                        {
                             Ok(t) => t,
                             Err(e) => {
-                                *validation_status_arc.lock().unwrap() = TimetableValidationStatus::Failed(format!(
-                                    "Invalid JSON format in timetable file: {}",
-                                    e
-                                ));
+                                *validation_status_arc.lock().unwrap() =
+                                    TimetableValidationStatus::Failed(
+                                        format!("Invalid JSON format in timetable file: {}", e)
+                                    );
                                 return;
                             }
                         };
                         let mut student_count = 0;
 
                         if timetable.as_object().is_none() {
-                            *validation_status_arc.lock().unwrap() = TimetableValidationStatus::Failed(
-                                "Invalid timetable file format: the JSON file is not a map".to_owned(),
-                            );
+                            *validation_status_arc.lock().unwrap() =
+                                TimetableValidationStatus::Failed(
+                                    "Invalid timetable file format: the JSON file is not a map".to_owned()
+                                );
                             return;
                         }
                         for student_key in timetable.as_object().unwrap().keys() {
-                            if student_key.chars().all(char::is_numeric)
-                                && 4 <= student_key.len()
-                                && student_key.len() <= 5
+                            if
+                                student_key.chars().all(char::is_numeric) &&
+                                4 <= student_key.len() &&
+                                student_key.len() <= 5
                             {
                                 student_count += 1;
                                 *student_count_arc.lock().unwrap() = Some(student_count);
                             } else {
-                                *validation_status_arc.lock().unwrap() = TimetableValidationStatus::Failed(format!(
-                                    "Invalid student number: \"{}\"",
-                                    student_key
-                                ));
+                                *validation_status_arc.lock().unwrap() =
+                                    TimetableValidationStatus::Failed(
+                                        format!("Invalid student number: \"{}\"", student_key)
+                                    );
                                 return;
                             }
                         }
 
                         *validation_status_arc.lock().unwrap() =
-                            TimetableValidationStatus::Validating(10, "Validating days of the week...".to_owned());
+                            TimetableValidationStatus::Validating(
+                                10,
+                                "Validating days of the week...".to_owned()
+                            );
                         for (student_key, week_timetable) in timetable.as_object().unwrap() {
                             if week_timetable.as_object().is_none() {
-                                *validation_status_arc.lock().unwrap() = TimetableValidationStatus::Failed(format!(
-                                    "Invalid timetable file format: student {}'s timetable is not a map",
-                                    student_key
-                                ));
+                                *validation_status_arc.lock().unwrap() =
+                                    TimetableValidationStatus::Failed(
+                                        format!("Invalid timetable file format: student {}'s timetable is not a map", student_key)
+                                    );
                                 return;
                             }
                             let mut days_of_week = [false; 5];
                             for day_key in week_timetable.as_object().unwrap().keys() {
-                                if day_key.chars().all(char::is_numeric)
-                                    && day_key.parse::<i32>().unwrap() <= 5
-                                    && day_key.parse::<i32>().unwrap() >= 1
+                                if
+                                    day_key.chars().all(char::is_numeric) &&
+                                    day_key.parse::<i32>().unwrap() <= 5 &&
+                                    day_key.parse::<i32>().unwrap() >= 1
                                 {
-                                    days_of_week[day_key.parse::<i32>().unwrap() as usize - 1] = true;
+                                    days_of_week[
+                                        (day_key.parse::<i32>().unwrap() as usize) - 1
+                                    ] = true;
                                 } else {
-                                    *validation_status_arc.lock().unwrap() = TimetableValidationStatus::Failed(format!(
-                                        "Student {} has an invalid day of week: \"{}\"",
-                                        student_key, day_key
-                                    ));
+                                    *validation_status_arc.lock().unwrap() =
+                                        TimetableValidationStatus::Failed(
+                                            format!(
+                                                "Student {} has an invalid day of week: \"{}\"",
+                                                student_key,
+                                                day_key
+                                            )
+                                        );
                                     return;
                                 }
                             }
                             if days_of_week.contains(&false) {
-                                *validation_status_arc.lock().unwrap() = TimetableValidationStatus::Failed(format!(
-                                    "Student {} has an incomplete timetable: missing day {}",
-                                    student_key,
-                                    days_of_week
-                                        .iter()
-                                        .enumerate()
-                                        .filter(|(_, &b)| !b)
-                                        .map(|(i, _)| i + 1)
-                                        .collect::<Vec<usize>>()
-                                        .iter()
-                                        .map(|i| i.to_string())
-                                        .collect::<Vec<String>>()
-                                        .join(", ")
-                                ));
+                                *validation_status_arc.lock().unwrap() =
+                                    TimetableValidationStatus::Failed(
+                                        format!(
+                                            "Student {} has an incomplete timetable: missing day {}",
+                                            student_key,
+                                            days_of_week
+                                                .iter()
+                                                .enumerate()
+                                                .filter(|(_, &b)| !b)
+                                                .map(|(i, _)| i + 1)
+                                                .collect::<Vec<usize>>()
+                                                .iter()
+                                                .map(|i| i.to_string())
+                                                .collect::<Vec<String>>()
+                                                .join(", ")
+                                        )
+                                    );
                                 return;
                             }
                         }
 
                         *validation_status_arc.lock().unwrap() =
-                            TimetableValidationStatus::Validating(20, "Validating periods...".to_owned());
+                            TimetableValidationStatus::Validating(
+                                20,
+                                "Validating periods...".to_owned()
+                            );
                         for (student_key, week_timetable) in timetable.as_object().unwrap() {
                             for (day_key, day_timetable) in week_timetable.as_object().unwrap() {
                                 if day_timetable.as_object().is_none() {
-                                    *validation_status_arc.lock().unwrap() = TimetableValidationStatus::Failed(format!(
-                                        "Invalid timetable file format: student {}'s timetable on day {} is not a map",
-                                        student_key, day_key
-                                    ));
+                                    *validation_status_arc.lock().unwrap() =
+                                        TimetableValidationStatus::Failed(
+                                            format!(
+                                                "Invalid timetable file format: student {}'s timetable on day {} is not a map",
+                                                student_key,
+                                                day_key
+                                            )
+                                        );
                                     return;
                                 }
                                 let mut periods = [false; 10];
                                 for period_key in day_timetable.as_object().unwrap().keys() {
-                                    if period_key.chars().all(char::is_numeric)
-                                        && period_key.parse::<i32>().unwrap() <= 10
-                                        && period_key.parse::<i32>().unwrap() >= 1
+                                    if
+                                        period_key.chars().all(char::is_numeric) &&
+                                        period_key.parse::<i32>().unwrap() <= 10 &&
+                                        period_key.parse::<i32>().unwrap() >= 1
                                     {
-                                        periods[period_key.parse::<i32>().unwrap() as usize - 1] = true;
+                                        periods[
+                                            (period_key.parse::<i32>().unwrap() as usize) - 1
+                                        ] = true;
                                     } else {
                                         *validation_status_arc.lock().unwrap() =
-                                            TimetableValidationStatus::Failed(format!(
-                                                "Student {} has an invalid period on day {}: \"{}\"",
-                                                student_key, day_key, period_key
-                                            ));
+                                            TimetableValidationStatus::Failed(
+                                                format!(
+                                                    "Student {} has an invalid period on day {}: \"{}\"",
+                                                    student_key,
+                                                    day_key,
+                                                    period_key
+                                                )
+                                            );
                                         return;
                                     }
                                 }
                                 if periods.contains(&false) {
-                                    *validation_status_arc.lock().unwrap() = TimetableValidationStatus::Failed(format!(
-                                        "Student {} has an incomplete timetable on day {}: missing periods {}",
-                                        student_key,
-                                        day_key,
-                                        periods
-                                            .iter()
-                                            .enumerate()
-                                            .filter(|(_, &b)| !b)
-                                            .map(|(i, _)| i + 1)
-                                            .collect::<Vec<usize>>()
-                                            .iter()
-                                            .map(|i| i.to_string())
-                                            .collect::<Vec<String>>()
-                                            .join(", ")
-                                    ));
+                                    *validation_status_arc.lock().unwrap() =
+                                        TimetableValidationStatus::Failed(
+                                            format!(
+                                                "Student {} has an incomplete timetable on day {}: missing periods {}",
+                                                student_key,
+                                                day_key,
+                                                periods
+                                                    .iter()
+                                                    .enumerate()
+                                                    .filter(|(_, &b)| !b)
+                                                    .map(|(i, _)| i + 1)
+                                                    .collect::<Vec<usize>>()
+                                                    .iter()
+                                                    .map(|i| i.to_string())
+                                                    .collect::<Vec<String>>()
+                                                    .join(", ")
+                                            )
+                                        );
                                     return;
                                 }
                             }
                         }
 
                         *validation_status_arc.lock().unwrap() =
-                            TimetableValidationStatus::Validating(20, "Validating classrooms...".to_owned());
+                            TimetableValidationStatus::Validating(
+                                20,
+                                "Validating classrooms...".to_owned()
+                            );
                         let mut sessions = 0;
                         for (student_key, week_timetable) in timetable.as_object().unwrap() {
                             for (day_key, day_timetable) in week_timetable.as_object().unwrap() {
                                 for (period_key, room) in day_timetable.as_object().unwrap() {
                                     if !rooms.contains(&room.as_str().unwrap().to_owned()) {
                                         *validation_status_arc.lock().unwrap() =
-                                            TimetableValidationStatus::Failed(format!(
-                                                "Student {} has an invalid classroom on day {} period {}: {}",
-                                                student_key, day_key, period_key, room
-                                            ));
+                                            TimetableValidationStatus::Failed(
+                                                format!(
+                                                    "Student {} has an invalid classroom on day {} period {}: {}",
+                                                    student_key,
+                                                    day_key,
+                                                    period_key,
+                                                    room
+                                                )
+                                            );
                                         return;
                                     }
                                     sessions += 1;
                                     if sessions % 1000 == 0 {
                                         *session_count_arc.lock().unwrap() = Some(sessions);
-                                        *validation_status_arc.lock().unwrap() = TimetableValidationStatus::Validating(
-                                            20 + (sessions as f32 / (student_count * 10 * 5) as f32 * 80.0) as i32,
-                                            "Validating classrooms...".to_owned(),
-                                        );
+                                        *validation_status_arc.lock().unwrap() =
+                                            TimetableValidationStatus::Validating(
+                                                20 +
+                                                    (
+                                                        (((sessions as f32) /
+                                                            ((student_count * 10 * 5) as f32)) *
+                                                            80.0) as i32
+                                                    ),
+                                                "Validating classrooms...".to_owned()
+                                            );
                                     }
                                 }
                             }
                         }
                         *timetable_arc.lock().unwrap() = Some(timetable.clone());
 
-                        *student_list_arc.lock().unwrap() =
-                            timetable.as_object().unwrap().keys().map(|k| k.to_owned()).collect();
+                        *student_list_arc.lock().unwrap() = timetable
+                            .as_object()
+                            .unwrap()
+                            .keys()
+                            .map(|k| k.to_owned())
+                            .collect();
 
-                        *validation_status_arc.lock().unwrap() = TimetableValidationStatus::Successful;
+                        *validation_status_arc.lock().unwrap() =
+                            TimetableValidationStatus::Successful;
                     });
                 }
                 TimetableValidationStatus::Validating(progress, message) => {
                     ui.with_layout(Layout::top_down_justified(egui::Align::Center), |ui| {
-                        ui.label(RichText::new(material_design_icons::MDI_CALENDAR_SEARCH).size(32.0));
+                        ui.label(
+                            RichText::new(material_design_icons::MDI_CALENDAR_SEARCH).size(32.0)
+                        );
                         ui.label(message);
-                        ui.add(ProgressBar::new(progress as f32 / 100.0));
+                        ui.add(ProgressBar::new((progress as f32) / 100.0));
                     });
                 }
                 TimetableValidationStatus::Failed(_) => {
@@ -1482,7 +1702,7 @@ impl OptiWayApp {
                         ui.label(
                             RichText::new(material_design_icons::MDI_CALENDAR_REMOVE)
                                 .size(32.0)
-                                .color(Color32::from_rgb(0xe4, 0x37, 0x48)),
+                                .color(Color32::from_rgb(0xe4, 0x37, 0x48))
                         );
                         ui.label("Validation failed");
                         ui.label(current_validation_status.get_error_message());
@@ -1496,7 +1716,7 @@ impl OptiWayApp {
                         ui.label(
                             RichText::new(material_design_icons::MDI_CALENDAR_CHECK)
                                 .size(32.0)
-                                .color(Color32::from_rgb(0x14, 0xae, 0x52)),
+                                .color(Color32::from_rgb(0x14, 0xae, 0x52))
                         );
                         ui.label("Validation successful");
                         ui.label(
@@ -1512,83 +1732,79 @@ impl OptiWayApp {
     }
 
     fn show_timetable_window(&mut self, ctx: &egui::Context) {
-        Window::new("Timetable").open(&mut self.show_timetable_window).show(ctx, |ui| {
-            if self
-                .timetable_file_info
-                .validation_status
-                .lock()
-                .unwrap()
-                .clone()
-                == TimetableValidationStatus::Successful
-            {
-                if let Some(student) = &self.selected_student {
-                    ui.label(format!("{}'s Timetable", student));
-                    egui::Grid::new("timetable_grid")
-                        .striped(true)
-                        .show(ui, |ui| {
-                            ui.label("Period");
-                            ui.label("Monday");
-                            ui.label("Tuesday");
-                            ui.label("Wednesday");
-                            ui.label("Thursday");
-                            ui.label("Friday");
-                            ui.end_row();
-
-                            let timetable = self.timetable_file_info.timetable.lock().unwrap();
-
-                            for period in 1..=10 {
-                                ui.label(format!("Period {}", period));
-                                for weekday in 1..=5 {
-                                    let mut session = timetable
-                                        .as_ref()
-                                        .unwrap()
-                                        .get(student)
-                                        .unwrap()
-                                        .get(weekday.to_string())
-                                        .unwrap()
-                                        .get(period.to_string())
-                                        .unwrap()
-                                        .as_str()
-                                        .unwrap();
-                                    if session == "G" {
-                                        session = " ";
-                                    }
-                                    ui.label(session);
-                                }
+        Window::new("Timetable")
+            .open(&mut self.show_timetable_window)
+            .show(ctx, |ui| {
+                if
+                    self.timetable_file_info.validation_status.lock().unwrap().clone() ==
+                    TimetableValidationStatus::Successful
+                {
+                    if let Some(student) = &self.selected_student {
+                        ui.label(format!("{}'s Timetable", student));
+                        egui::Grid
+                            ::new("timetable_grid")
+                            .striped(true)
+                            .show(ui, |ui| {
+                                ui.label("Period");
+                                ui.label("Monday");
+                                ui.label("Tuesday");
+                                ui.label("Wednesday");
+                                ui.label("Thursday");
+                                ui.label("Friday");
                                 ui.end_row();
-                            }
-                        });
+
+                                let timetable = self.timetable_file_info.timetable.lock().unwrap();
+
+                                for period in 1..=10 {
+                                    ui.label(format!("Period {}", period));
+                                    for weekday in 1..=5 {
+                                        let mut session = timetable
+                                            .as_ref()
+                                            .unwrap()
+                                            .get(student)
+                                            .unwrap()
+                                            .get(weekday.to_string())
+                                            .unwrap()
+                                            .get(period.to_string())
+                                            .unwrap()
+                                            .as_str()
+                                            .unwrap();
+                                        if session == "G" {
+                                            session = " ";
+                                        }
+                                        ui.label(session);
+                                    }
+                                    ui.end_row();
+                                }
+                            });
+                    } else {
+                        ui.label("No student selected.");
+                    }
                 } else {
-                    ui.label("No student selected.");
+                    ui.label("Timetable not imported.");
                 }
-            } else {
-                ui.label("Timetable not imported.");
-            }
-        });
+            });
     }
 
     fn show_pi_window(&mut self, ctx: &egui::Context) {
-        egui::Window::new("Performance Indices")
+        egui::Window
+            ::new("Performance Indices")
             .open(&mut self.show_pi_window)
             .show(ctx, |ui| {
-                let performance_indices_shortest =
-                    self.performance_indices_shortest.lock().unwrap();
-                let performance_indices_optimized =
-                    self.performance_indices_optimized.lock().unwrap();
+                let performance_indices_shortest = self.performance_indices_shortest
+                    .lock()
+                    .unwrap();
+                let performance_indices_optimized = self.performance_indices_optimized
+                    .lock()
+                    .unwrap();
                 ui.horizontal(|ui| {
-                    if ui
-                        .selectable_label(self.show_pi_shortest, "shortest Path")
-                        .clicked()
-                    {
+                    if ui.selectable_label(self.show_pi_shortest, "shortest Path").clicked() {
                         self.show_pi_shortest = true;
-                    };
+                    }
 
-                    if ui
-                        .selectable_label(!self.show_pi_shortest, "Optimized Path")
-                        .clicked()
-                    {
+                    if ui.selectable_label(!self.show_pi_shortest, "Optimized Path").clicked() {
                         self.show_pi_shortest = false;
-                    };
+                    }
                 });
                 ui.separator();
                 ui.label("Performance Indices Overview");
@@ -1613,14 +1829,18 @@ impl OptiWayApp {
                         for index in 0..=11 {
                             ui.label(convert_periods(index));
                             for day in 1..=5 {
-                                if (hightlights[(day - 1) as usize] as usize == index)
-                                    && optimization_status == OptimizationStatus::Calculating {
-                                    ui.label(RichText::new(pi_matrix[&day][&index].to_formatted_string(&Locale::fr))
-                                        .color(Color32::from_rgb(0xec, 0x6f, 0x27)));
+                                if
+                                    (hightlights[(day - 1) as usize] as usize) == index &&
+                                    optimization_status == OptimizationStatus::Calculating
+                                {
+                                    ui.label(
+                                        RichText::new(
+                                            pi_matrix[&day][&index].to_formatted_string(&Locale::fr)
+                                        ).color(Color32::from_rgb(0xec, 0x6f, 0x27))
+                                    );
                                 } else {
                                     ui.label(
-                                        pi_matrix[&day][&index]
-                                            .to_formatted_string(&Locale::fr),
+                                        pi_matrix[&day][&index].to_formatted_string(&Locale::fr)
                                     );
                                 }
                             }
@@ -1630,8 +1850,9 @@ impl OptiWayApp {
                 ui.separator();
                 ui.label("Current Period PI");
                 ui.heading(
-                    pi_matrix[&self.selected_day][&self.selected_period]
-                        .to_formatted_string(&Locale::fr),
+                    pi_matrix[&self.selected_day][&self.selected_period].to_formatted_string(
+                        &Locale::fr
+                    )
                 );
                 ui.separator();
                 ui.label("Current Day PI");
@@ -1639,7 +1860,7 @@ impl OptiWayApp {
                     pi_matrix[&self.selected_day]
                         .values()
                         .sum::<u128>()
-                        .to_formatted_string(&Locale::fr),
+                        .to_formatted_string(&Locale::fr)
                 );
                 ui.separator();
                 ui.label("Total PI");
@@ -1648,7 +1869,7 @@ impl OptiWayApp {
                         .values()
                         .map(|day| day.values().sum::<u128>())
                         .sum::<u128>()
-                        .to_formatted_string(&Locale::fr),
+                        .to_formatted_string(&Locale::fr)
                 );
                 ui.separator();
                 ui.label(
@@ -1662,40 +1883,36 @@ impl OptiWayApp {
 fn run_floyd_algorithm_cpp(
     filepath: PathBuf,
     path_generation_status_arc: Arc<Mutex<PathGenerationStatus>>,
-    student_paths_arc: Arc<Mutex<Option<Routes>>>,
+    student_paths_arc: Arc<Mutex<Option<Routes>>>
 ) -> String {
     let bin_dir = fs::canonicalize("./bin").unwrap();
     if let Ok(binding) = fs::canonicalize(filepath) {
         let json_path = binding.to_str().unwrap();
         println!("{:?}\n{:?}", bin_dir, json_path);
-        if let Ok(mut floyd_command) = Command::new("./floyd.out")
-            .current_dir(&bin_dir)
-            .stdin(Stdio::piped())
-            .spawn()
+        if
+            let Ok(mut floyd_command) = Command::new("./floyd.out")
+                .current_dir(&bin_dir)
+                .stdin(Stdio::piped())
+                .spawn()
         {
-            floyd_command
-                .stdin
-                .as_mut()
-                .unwrap()
-                .write_all(json_path.as_bytes())
-                .unwrap();
+            floyd_command.stdin.as_mut().unwrap().write_all(json_path.as_bytes()).unwrap();
             let output = floyd_command.wait_with_output();
             if output.is_err() {
                 *path_generation_status_arc.lock().unwrap() = PathGenerationStatus::Failed(
-                    "Failed to execute algorithm binary [floyd.out].".to_owned(),
+                    "Failed to execute algorithm binary [floyd.out].".to_owned()
                 );
             } else if output.as_ref().unwrap().status.success() {
                 *path_generation_status_arc.lock().unwrap() = PathGenerationStatus::LoadingJSON;
                 let result_path = bin_dir.join("routes.json");
                 let Ok(file_content) = fs::read_to_string(result_path) else {
                     *path_generation_status_arc.lock().unwrap() = PathGenerationStatus::Failed(
-                        "Failed to read result file [routes.json].".to_owned(),
+                        "Failed to read result file [routes.json].".to_owned()
                     );
                     return "".to_owned();
                 };
                 let Ok(routes) = serde_json::from_str::<Routes>(&file_content) else {
                     *path_generation_status_arc.lock().unwrap() = PathGenerationStatus::Failed(
-                        "Failed to parse result file [routes.json].".to_owned(),
+                        "Failed to parse result file [routes.json].".to_owned()
                     );
                     return "".to_owned();
                 };
@@ -1703,20 +1920,22 @@ fn run_floyd_algorithm_cpp(
                 *path_generation_status_arc.lock().unwrap() = PathGenerationStatus::Successful;
                 return file_content;
             } else {
-                *path_generation_status_arc.lock().unwrap() =
-                    PathGenerationStatus::Failed(format!(
+                *path_generation_status_arc.lock().unwrap() = PathGenerationStatus::Failed(
+                    format!(
                         "Algorithm binary [floyd.out] exited with code {}.",
                         output.unwrap().status.code().unwrap()
-                    ));
+                    )
+                );
             }
         } else {
             *path_generation_status_arc.lock().unwrap() = PathGenerationStatus::Failed(
-                "Failed to execute algorithm binary [floyd.out].".to_owned(),
+                "Failed to execute algorithm binary [floyd.out].".to_owned()
             );
         }
     } else {
-        *path_generation_status_arc.lock().unwrap() =
-            PathGenerationStatus::Failed("Failed to find timetable file.".to_owned());
+        *path_generation_status_arc.lock().unwrap() = PathGenerationStatus::Failed(
+            "Failed to find timetable file.".to_owned()
+        );
     }
     "".to_owned()
 }
@@ -1726,19 +1945,19 @@ fn run_floyd_algorithm_rust(
     filepath: PathBuf,
     shortest_paths_json: HashMap<String, String>,
     path_generation_status_arc: Arc<Mutex<PathGenerationStatus>>,
-    student_paths_arc: Arc<Mutex<Option<Routes>>>,
+    student_paths_arc: Arc<Mutex<Option<Routes>>>
 ) {
     type Timetable = HashMap<String, HashMap<u32, HashMap<usize, String>>>;
     let mut result: Routes = HashMap::new();
     let Ok(timetable_file) = File::open(filepath) else {
-        *path_generation_status_arc.lock().unwrap() =
-            PathGenerationStatus::Failed("Failed to find timetable file.".to_owned());
+        *path_generation_status_arc.lock().unwrap() = PathGenerationStatus::Failed(
+            "Failed to find timetable file.".to_owned()
+        );
         return;
     };
     let Ok(timetable_json) = serde_json::from_reader::<_, Timetable>(timetable_file) else {
         *path_generation_status_arc.lock().unwrap() = PathGenerationStatus::Failed(
-            "Failed to parse timetable file. Please make sure the file is in JSON format."
-                .to_owned(),
+            "Failed to parse timetable file. Please make sure the file is in JSON format.".to_owned()
         );
         return;
     };
@@ -1749,19 +1968,11 @@ fn run_floyd_algorithm_rust(
             let mut day_hashmap: HashMap<usize, String> = HashMap::new();
             student_timetable.entry(day).or_insert_with(HashMap::new);
             day_hashmap.insert(0, {
-                let first_room = student_timetable
-                    .get(&day)
-                    .unwrap()
-                    .get(&1)
-                    .unwrap()
-                    .to_owned();
+                let first_room = student_timetable.get(&day).unwrap().get(&1).unwrap().to_owned();
                 if first_room == "G" {
                     "".to_owned()
                 } else {
-                    shortest_paths_json
-                        .get(format!("G{}", first_room).as_str())
-                        .unwrap()
-                        .to_owned()
+                    shortest_paths_json.get(format!("G{}", first_room).as_str()).unwrap().to_owned()
                 }
             });
             for period in 1..=5 {
@@ -1789,35 +2000,19 @@ fn run_floyd_algorithm_rust(
                 });
             }
             day_hashmap.insert(6, {
-                let first_room = student_timetable
-                    .get(&day)
-                    .unwrap()
-                    .get(&6)
-                    .unwrap()
-                    .to_owned();
+                let first_room = student_timetable.get(&day).unwrap().get(&6).unwrap().to_owned();
                 if first_room == "G" {
                     "".to_owned()
                 } else {
-                    shortest_paths_json
-                        .get(format!("{}G", first_room).as_str())
-                        .unwrap()
-                        .to_owned()
+                    shortest_paths_json.get(format!("{}G", first_room).as_str()).unwrap().to_owned()
                 }
             });
             day_hashmap.insert(7, {
-                let first_room = student_timetable
-                    .get(&day)
-                    .unwrap()
-                    .get(&7)
-                    .unwrap()
-                    .to_owned();
+                let first_room = student_timetable.get(&day).unwrap().get(&7).unwrap().to_owned();
                 if first_room == "G" {
                     "".to_owned()
                 } else {
-                    shortest_paths_json
-                        .get(format!("G{}", first_room).as_str())
-                        .unwrap()
-                        .to_owned()
+                    shortest_paths_json.get(format!("G{}", first_room).as_str()).unwrap().to_owned()
                 }
             });
             for period in 7..=9 {
@@ -1845,19 +2040,11 @@ fn run_floyd_algorithm_rust(
                 });
             }
             day_hashmap.insert(11, {
-                let first_room = student_timetable
-                    .get(&day)
-                    .unwrap()
-                    .get(&10)
-                    .unwrap()
-                    .to_owned();
+                let first_room = student_timetable.get(&day).unwrap().get(&10).unwrap().to_owned();
                 if first_room == "G" {
                     "".to_owned()
                 } else {
-                    shortest_paths_json
-                        .get(format!("{}G", first_room).as_str())
-                        .unwrap()
-                        .to_owned()
+                    shortest_paths_json.get(format!("{}G", first_room).as_str()).unwrap().to_owned()
                 }
             });
             student_hashmap.insert(day, day_hashmap);
@@ -1874,9 +2061,7 @@ impl eframe::App for OptiWayApp {
     // }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        let current_validation_status = self
-            .timetable_file_info
-            .validation_status
+        let current_validation_status = self.timetable_file_info.validation_status
             .lock()
             .unwrap()
             .clone();
@@ -1889,23 +2074,27 @@ impl eframe::App for OptiWayApp {
                 egui::warn_if_debug_build(ui);
                 ui.separator();
                 if current_validation_status != TimetableValidationStatus::Successful {
-                    ui.label(material_design_icons::MDI_CALENDAR_ALERT)
-                        .on_hover_text("Timetable not imported.");
+                    ui.label(material_design_icons::MDI_CALENDAR_ALERT).on_hover_text(
+                        "Timetable not imported."
+                    );
                     ui.separator();
                 }
                 if self.selected_student.is_none() {
-                    ui.label(material_design_icons::MDI_ACCOUNT_ALERT)
-                        .on_hover_text("No student selected.");
+                    ui.label(material_design_icons::MDI_ACCOUNT_ALERT).on_hover_text(
+                        "No student selected."
+                    );
                     ui.separator();
                 }
                 if self.student_routes_shortest.lock().unwrap().is_none() {
-                    ui.label(material_design_icons::MDI_SIGN_DIRECTION_REMOVE)
-                        .on_hover_text("Path not calculated.");
+                    ui.label(material_design_icons::MDI_SIGN_DIRECTION_REMOVE).on_hover_text(
+                        "Path not calculated."
+                    );
                     ui.separator();
                 }
                 if current_congestion_status != CongestionStatus::Successful {
-                    ui.label(material_design_icons::MDI_VECTOR_POLYLINE_REMOVE)
-                        .on_hover_text("Congestion not calculated.");
+                    ui.label(material_design_icons::MDI_VECTOR_POLYLINE_REMOVE).on_hover_text(
+                        "Congestion not calculated."
+                    );
                     ui.separator();
                 }
                 ui.with_layout(Layout::right_to_left(egui::Align::Center), |ui| {
@@ -1929,16 +2118,21 @@ impl eframe::App for OptiWayApp {
         egui::SidePanel::right("side_panel").show(ctx, |ui| {
             egui::ScrollArea::vertical().show(ui, |ui| {
                 ui.with_layout(Layout::top_down_justified(egui::Align::LEFT), |ui| {
-                    ui.heading("Command center")
-                        .on_hover_text("Follow the order of the buttons from top to bottom to complete the process.");
+                    ui.heading("Command center").on_hover_text(
+                        "Follow the order of the buttons from top to bottom to complete the process."
+                    );
                     if ui.button("Import timetable").clicked() {
                         let file = FileDialog::new()
                             .add_filter("JSON", &["json"])
                             .set_directory("../")
                             .pick_file();
                         if let Some(file) = file {
-                            self.timetable_file_info.filename =
-                                file.file_name().unwrap().to_str().unwrap().to_owned();
+                            self.timetable_file_info.filename = file
+                                .file_name()
+                                .unwrap()
+                                .to_str()
+                                .unwrap()
+                                .to_owned();
                             self.timetable_file_info.filepath = file;
                             self.show_json_validation = true;
                             *self.timetable_file_info.validation_status.lock().unwrap() =
@@ -1949,44 +2143,50 @@ impl eframe::App for OptiWayApp {
                     ui.add_enabled_ui(
                         current_validation_status == TimetableValidationStatus::Successful,
                         |ui| {
-                            if ui
-                                .button("Baseline benchmark")
-                                .on_hover_text("Generate shortest routes for all students as a baseline plan.")
-                                .on_disabled_hover_text("Import a timetable first.")
-                                .clicked()
+                            if
+                                ui
+                                    .button("Baseline benchmark")
+                                    .on_hover_text(
+                                        "Generate shortest routes for all students as a baseline plan."
+                                    )
+                                    .on_disabled_hover_text("Import a timetable first.")
+                                    .clicked()
                             {
                                 self.show_path_gen_window = true;
                                 *self.path_generation_status.lock().unwrap() =
                                     PathGenerationStatus::Ready;
                             }
-                        },
+                        }
                     );
                     ui.add_enabled_ui(
                         current_path_status == PathGenerationStatus::Successful,
                         |ui| {
-                            if ui
-                                .button("Calculate congestion")
-                                .on_disabled_hover_text("Calculate routes first.")
-                                .clicked()
+                            if
+                                ui
+                                    .button("Calculate congestion")
+                                    .on_disabled_hover_text("Calculate routes first.")
+                                    .clicked()
                             {
                                 self.show_congestion_window = true;
                                 *self.congestion_status.lock().unwrap() = CongestionStatus::Ready;
                             }
-                        },
+                        }
                     );
                     ui.add_enabled_ui(
                         current_congestion_status == CongestionStatus::Successful,
                         |ui| {
-                            if ui
-                                .button("Optimize routes")
-                                .on_disabled_hover_text("Calculate congestion first.")
-                                .on_hover_text("Start the optimization iteration process.")
-                                .clicked()
+                            if
+                                ui
+                                    .button("Optimize routes")
+                                    .on_disabled_hover_text("Calculate congestion first.")
+                                    .on_hover_text("Start the optimization iteration process.")
+                                    .clicked()
                             {
                                 self.show_optimization_window = true;
-                                *self.optimization_status.lock().unwrap() = OptimizationStatus::ParamInput;
+                                *self.optimization_status.lock().unwrap() =
+                                    OptimizationStatus::ParamInput;
                             }
-                        },
+                        }
                     );
                     ui.separator();
                     ComboBox::from_label("Route display mode")
@@ -1995,22 +2195,26 @@ impl eframe::App for OptiWayApp {
                             ui.selectable_value(
                                 &mut self.path_display,
                                 PathDisplay::Shortest,
-                                "Shortest route",
+                                "Shortest route"
                             );
-                            ui.add_enabled_ui(self.student_routes_optimized.lock().unwrap().is_some(), |ui| {
-                                ui.selectable_value(
-                                    &mut self.path_display,
-                                    PathDisplay::Optimized,
-                                    "Optimized route",
-                                );
-                            });
+                            ui.add_enabled_ui(
+                                self.student_routes_optimized.lock().unwrap().is_some(),
+                                |ui| {
+                                    ui.selectable_value(
+                                        &mut self.path_display,
+                                        PathDisplay::Optimized,
+                                        "Optimized route"
+                                    );
+                                }
+                            );
                         });
                     ComboBox::from_label("Student")
                         .selected_text(self.selected_student.clone().unwrap_or("—".to_owned()))
                         .show_ui(ui, |ui| {
                             ui.add(
-                                egui::TextEdit::singleline(&mut self.student_number_search)
-                                    .hint_text("Search"),
+                                egui::TextEdit
+                                    ::singleline(&mut self.student_number_search)
+                                    .hint_text("Search")
                             );
                             ui.separator();
                             for student in self.student_list.lock().unwrap().iter() {
@@ -2018,7 +2222,7 @@ impl eframe::App for OptiWayApp {
                                     ui.selectable_value(
                                         &mut self.selected_student,
                                         Some(student.to_owned()),
-                                        student,
+                                        student
                                     );
                                 }
                             }
@@ -2030,7 +2234,7 @@ impl eframe::App for OptiWayApp {
                                 ui.selectable_value(
                                     &mut self.selected_day,
                                     i,
-                                    convert_day_of_week(i),
+                                    convert_day_of_week(i)
                                 );
                             }
                         });
@@ -2041,7 +2245,7 @@ impl eframe::App for OptiWayApp {
                                 ui.selectable_value(
                                     &mut self.selected_period,
                                     i,
-                                    convert_periods(i),
+                                    convert_periods(i)
                                 );
                             }
                         });
@@ -2090,10 +2294,7 @@ impl eframe::App for OptiWayApp {
                     ui.separator();
                     ui.heading("Floor view");
                     ui.horizontal(|ui| {
-                        if ui
-                            .toggle_value(&mut self.selected_floor[0], "All")
-                            .clicked()
-                        {
+                        if ui.toggle_value(&mut self.selected_floor[0], "All").clicked() {
                             self.selected_floor_index = 0;
                             for i in 1..=8 {
                                 self.selected_floor[i] = false;
@@ -2101,11 +2302,12 @@ impl eframe::App for OptiWayApp {
                             if !self.selected_floor.contains(&true) {
                                 self.selected_floor[0] = true;
                             }
-                        };
+                        }
                         for i in 2..=8 {
-                            if ui
-                                .toggle_value(&mut self.selected_floor[i], format!("{}F", i))
-                                .clicked()
+                            if
+                                ui
+                                    .toggle_value(&mut self.selected_floor[i], format!("{}F", i))
+                                    .clicked()
                             {
                                 self.selected_floor_index = i;
                                 for j in 0..=8 {
@@ -2120,21 +2322,16 @@ impl eframe::App for OptiWayApp {
                         }
                     });
                     ui.add(
-                        Slider::new(&mut self.inactive_brightness, 32..=255)
-                            .text("Inactive floor brightness"),
+                        Slider::new(&mut self.inactive_brightness, 32..=255).text(
+                            "Inactive floor brightness"
+                        )
                     );
                     ui.separator();
                     ui.horizontal(|ui| {
-                        if ui
-                            .selectable_label(!self.show_congestion, "Show paths")
-                            .clicked()
-                        {
+                        if ui.selectable_label(!self.show_congestion, "Show paths").clicked() {
                             self.show_congestion = false;
                         }
-                        if ui
-                            .selectable_label(self.show_congestion, "Show congestion")
-                            .clicked()
-                        {
+                        if ui.selectable_label(self.show_congestion, "Show congestion").clicked() {
                             self.show_congestion = true;
                         }
                     });
@@ -2142,7 +2339,8 @@ impl eframe::App for OptiWayApp {
                         ui.checkbox(&mut self.show_congestion_path, "Show path congestion");
                         ui.checkbox(&mut self.show_congestion_point, "Show node congestion");
                         ui.heading("Legend");
-                        egui::Grid::new("congestion_legend")
+                        egui::Grid
+                            ::new("congestion_legend")
                             .num_columns(2)
                             .show(ui, |ui| {
                                 ui.label(RichText::new("●").color(congestion_color_scale(0)));
@@ -2168,22 +2366,22 @@ impl eframe::App for OptiWayApp {
                                 ui.end_row();
                             });
                         ui.add(
-                            Slider::new(&mut self.congestion_filter, 0..=400)
-                                .text("Minimum congestion"),
+                            Slider::new(&mut self.congestion_filter, 0..=400).text(
+                                "Minimum congestion"
+                            )
                         );
                     } else {
                         ui.horizontal(|ui| {
                             ui.vertical(|ui| {
                                 ui.label("Active path color");
                                 if ui.button("Reset").clicked() {
-                                    self.active_path_color =
-                                        Color32::from_rgb(0xec, 0x6f, 0x27);
+                                    self.active_path_color = Color32::from_rgb(0xec, 0x6f, 0x27);
                                 }
                             });
                             color_picker::color_picker_color32(
                                 ui,
                                 &mut self.active_path_color,
-                                color_picker::Alpha::Opaque,
+                                color_picker::Alpha::Opaque
                             );
                         });
                         ui.separator();
@@ -2198,7 +2396,7 @@ impl eframe::App for OptiWayApp {
                             color_picker::color_picker_color32(
                                 ui,
                                 &mut self.inactive_path_color,
-                                color_picker::Alpha::Opaque,
+                                color_picker::Alpha::Opaque
                             );
                         });
                     }
@@ -2284,18 +2482,20 @@ impl eframe::App for OptiWayApp {
                 let texture_cur: &TextureHandle = self.textures[i].get_or_insert_with(|| {
                     ui.ctx().load_texture(
                         format!("texture-floor-projection-{i}F"),
-                        load_image_from_path(Path::new(
-                            format!("../assets/projection-transparent/projection_{i}F.png")
-                                .as_str(),
-                        ))
-                        .unwrap(),
-                        Default::default(),
+                        load_image_from_path(
+                            Path::new(
+                                format!(
+                                    "../assets/projection-transparent/projection_{i}F.png"
+                                ).as_str()
+                            )
+                        ).unwrap(),
+                        Default::default()
                     )
                 });
                 textures.push(texture_cur.clone());
             }
             let desired_size = ui.available_size_before_wrap();
-            if desired_size.y < desired_size.x / 2243.0 * (1221.0 + 350.0) {
+            if desired_size.y < (desired_size.x / 2243.0) * (1221.0 + 350.0) {
                 ui.label("▲ There may not be enough space to display the floor plan.");
             }
             let (_id, rect) = ui.allocate_space(desired_size);
@@ -2312,158 +2512,153 @@ impl eframe::App for OptiWayApp {
             if !self.show_congestion {
                 for (i, point) in segments.iter().enumerate() {
                     if i != 0 {
-                        ui.painter().circle_filled(
-                            convert_pos(&rect, point, scale),
-                            4.0,
-                            if self.selected_floor_index == 0
-                                || (current_floor_z >= point[2].min(segments[i - 1][2])
-                                    && current_floor_z <= point[2].max(segments[i - 1][2]))
-                            {
-                                self.active_path_color
-                            } else {
-                                self.inactive_path_color
-                            },
-                        );
+                        ui.painter().circle_filled(convert_pos(&rect, point, scale), 4.0, if
+                            self.selected_floor_index == 0 ||
+                            (current_floor_z >= point[2].min(segments[i - 1][2]) &&
+                                current_floor_z <= point[2].max(segments[i - 1][2]))
+                        {
+                            self.active_path_color
+                        } else {
+                            self.inactive_path_color
+                        });
                         ui.painter().line_segment(
                             [
                                 convert_pos(&rect, segments[i - 1], scale),
                                 convert_pos(&rect, point, scale),
                             ],
-                            if self.selected_floor_index == 0
-                                || (current_floor_z >= point[2].min(segments[i - 1][2])
-                                    && current_floor_z <= point[2].max(segments[i - 1][2]))
+                            if
+                                self.selected_floor_index == 0 ||
+                                (current_floor_z >= point[2].min(segments[i - 1][2]) &&
+                                    current_floor_z <= point[2].max(segments[i - 1][2]))
                             {
                                 Stroke::new(4.0, self.active_path_color)
                             } else {
                                 Stroke::new(4.0, self.inactive_path_color)
-                            },
+                            }
                         );
                     } else {
-                        ui.painter().circle_filled(
-                            convert_pos(&rect, point, scale),
-                            4.0,
-                            if self.selected_floor_index == 0
-                                || (current_floor_z == point[2].min(segments[i][2]))
-                            {
-                                self.active_path_color
-                            } else {
-                                self.inactive_path_color
-                            },
-                        );
+                        ui.painter().circle_filled(convert_pos(&rect, point, scale), 4.0, if
+                            self.selected_floor_index == 0 ||
+                            current_floor_z == point[2].min(segments[i][2])
+                        {
+                            self.active_path_color
+                        } else {
+                            self.inactive_path_color
+                        });
                     }
                 }
             } else {
                 if self.show_congestion_path {
-                    if self.path_display == PathDisplay::Optimized
-                        && self.student_routes_optimized.lock().unwrap().is_some() {
-                        for ((node1, node2), congestion) in self
-                            .congestion_path_data_opt
+                    if
+                        self.path_display == PathDisplay::Optimized &&
+                        self.student_routes_optimized.lock().unwrap().is_some()
+                    {
+                        for ((node1, node2), congestion) in self.congestion_path_data_opt
                             .lock()
                             .unwrap()
                             .clone()
                             .get(&self.selected_day)
                             .unwrap()
                             .get(&self.selected_period)
-                            .unwrap()
-                        {
+                            .unwrap() {
                             if node1 == "G" || node2 == "G" || congestion < &self.congestion_filter {
                                 continue;
                             }
                             let node1_pos = self.projection_coords[node1];
                             let node2_pos = self.projection_coords[node2];
-                            if self.selected_floor_index == 0
-                                || (current_floor_z >= node1_pos[2].min(node2_pos[2])
-                                    && current_floor_z <= node1_pos[2].max(node2_pos[2]))
+                            if
+                                self.selected_floor_index == 0 ||
+                                (current_floor_z >= node1_pos[2].min(node2_pos[2]) &&
+                                    current_floor_z <= node1_pos[2].max(node2_pos[2]))
                             {
                                 ui.painter().line_segment(
                                     [
                                         convert_pos(&rect, &node1_pos, scale),
                                         convert_pos(&rect, &node2_pos, scale),
                                     ],
-                                    Stroke::new(4.0, congestion_color_scale(*congestion)),
+                                    Stroke::new(4.0, congestion_color_scale(*congestion))
                                 );
                             }
                         }
                     } else {
-                        for ((node1, node2), congestion) in self
-                            .congestion_path_data
+                        for ((node1, node2), congestion) in self.congestion_path_data
                             .lock()
                             .unwrap()
                             .clone()
                             .get(&self.selected_day)
                             .unwrap()
                             .get(&self.selected_period)
-                            .unwrap()
-                        {
+                            .unwrap() {
                             if node1 == "G" || node2 == "G" || congestion < &self.congestion_filter {
                                 continue;
                             }
                             let node1_pos = self.projection_coords[node1];
                             let node2_pos = self.projection_coords[node2];
-                            if self.selected_floor_index == 0
-                                || (current_floor_z >= node1_pos[2].min(node2_pos[2])
-                                    && current_floor_z <= node1_pos[2].max(node2_pos[2]))
+                            if
+                                self.selected_floor_index == 0 ||
+                                (current_floor_z >= node1_pos[2].min(node2_pos[2]) &&
+                                    current_floor_z <= node1_pos[2].max(node2_pos[2]))
                             {
                                 ui.painter().line_segment(
                                     [
                                         convert_pos(&rect, &node1_pos, scale),
                                         convert_pos(&rect, &node2_pos, scale),
                                     ],
-                                    Stroke::new(4.0, congestion_color_scale(*congestion)),
+                                    Stroke::new(4.0, congestion_color_scale(*congestion))
                                 );
                             }
                         }
                     }
                 }
                 if self.show_congestion_point {
-                    if self.path_display == PathDisplay::Optimized
-                        && self.student_routes_optimized.lock().unwrap().is_some() {
-                        for (room, congestion) in self
-                            .congestion_point_data
+                    if
+                        self.path_display == PathDisplay::Optimized &&
+                        self.student_routes_optimized.lock().unwrap().is_some()
+                    {
+                        for (room, congestion) in self.congestion_point_data
                             .lock()
                             .unwrap()
                             .clone()
                             .get(&self.selected_day)
                             .unwrap()
                             .get(&self.selected_period)
-                            .unwrap()
-                        {
+                            .unwrap() {
                             if room == "G" || room.is_empty() {
                                 continue;
                             }
                             let coords = self.projection_coords.get(room).unwrap();
-                            if (self.selected_floor_index == 0 || (current_floor_z == coords[2]))
-                                && *congestion >= self.congestion_filter
+                            if
+                                (self.selected_floor_index == 0 || current_floor_z == coords[2]) &&
+                                *congestion >= self.congestion_filter
                             {
                                 ui.painter().circle_filled(
                                     convert_pos(&rect, coords, scale),
                                     4.0,
-                                    congestion_color_scale(*congestion),
+                                    congestion_color_scale(*congestion)
                                 );
                             }
                         }
                     } else {
-                        for (room, congestion) in self
-                            .congestion_point_data_opt
+                        for (room, congestion) in self.congestion_point_data_opt
                             .lock()
                             .unwrap()
                             .clone()
                             .get(&self.selected_day)
                             .unwrap()
                             .get(&self.selected_period)
-                            .unwrap()
-                        {
+                            .unwrap() {
                             if room == "G" || room.is_empty() {
                                 continue;
                             }
                             let coords = self.projection_coords.get(room).unwrap();
-                            if (self.selected_floor_index == 0 || (current_floor_z == coords[2]))
-                                && *congestion >= self.congestion_filter
+                            if
+                                (self.selected_floor_index == 0 || current_floor_z == coords[2]) &&
+                                *congestion >= self.congestion_filter
                             {
                                 ui.painter().circle_filled(
                                     convert_pos(&rect, coords, scale),
                                     4.0,
-                                    congestion_color_scale(*congestion),
+                                    congestion_color_scale(*congestion)
                                 );
                             }
                         }
@@ -2474,9 +2669,8 @@ impl eframe::App for OptiWayApp {
             for (i, texture) in textures.iter().enumerate().take(7) {
                 let rect = Rect::from_min_size(
                     rect.min,
-                    emath::vec2(rect.width(), rect.width() / texture.aspect_ratio()),
-                )
-                .translate(emath::vec2(0.0, (7 - i) as f32 * 50.0 * scale));
+                    emath::vec2(rect.width(), rect.width() / texture.aspect_ratio())
+                ).translate(emath::vec2(0.0, ((7 - i) as f32) * 50.0 * scale));
 
                 ui.painter().image(
                     texture.into(),
@@ -2486,7 +2680,7 @@ impl eframe::App for OptiWayApp {
                         Color32::WHITE
                     } else {
                         Color32::from_gray(self.inactive_brightness)
-                    },
+                    }
                 );
             }
             // Special case: the floor is selected, so needs to be repainted last
@@ -2494,18 +2688,16 @@ impl eframe::App for OptiWayApp {
                 let texture = textures[self.selected_floor_index - 2].clone();
                 let rect = Rect::from_min_size(
                     rect.min,
-                    emath::vec2(rect.width(), rect.width() / texture.aspect_ratio()),
-                )
-                .translate(emath::vec2(
-                    0.0,
-                    (7 - (self.selected_floor_index - 2)) as f32 * 50.0 * scale,
-                ));
+                    emath::vec2(rect.width(), rect.width() / texture.aspect_ratio())
+                ).translate(
+                    emath::vec2(0.0, ((7 - (self.selected_floor_index - 2)) as f32) * 50.0 * scale)
+                );
 
                 ui.painter().image(
                     (&texture).into(),
                     rect,
                     Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                    Color32::WHITE,
+                    Color32::WHITE
                 );
             }
         });
@@ -2525,45 +2717,50 @@ fn convert_pos(rect: &Rect, pos: &[i32; 3], scale: f32) -> emath::Pos2 {
     /// Projection angle of the floor plan (radians)
     const ANGLE: f32 = PI / 6.0;
 
-    (emath::vec2(
-        rect.left() + 25.0 * ANGLE.cos() * scale,
-        rect.top() + (50.0 + 350.0 + 25.0 * ANGLE.sin()) * scale,
-    ) + emath::vec2(
-        ((pos[0] as f32) * ANGLE.cos() + (pos[1] as f32) * ANGLE.cos()) * scale,
-        ((pos[0] as f32) * ANGLE.sin() - (pos[1] as f32) * ANGLE.sin() - (pos[2] as f32)) * scale,
-    ))
-    .to_pos2()
+    (
+        emath::vec2(
+            rect.left() + 25.0 * ANGLE.cos() * scale,
+            rect.top() + (50.0 + 350.0 + 25.0 * ANGLE.sin()) * scale
+        ) +
+        emath::vec2(
+            ((pos[0] as f32) * ANGLE.cos() + (pos[1] as f32) * ANGLE.cos()) * scale,
+            ((pos[0] as f32) * ANGLE.sin() - (pos[1] as f32) * ANGLE.sin() - (pos[2] as f32)) *
+                scale
+        )
+    ).to_pos2()
 }
 
 fn convert_day_of_week(day: u32) -> String {
-    match day {
-        1 => "Monday",
-        2 => "Tuesday",
-        3 => "Wednesday",
-        4 => "Thursday",
-        5 => "Friday",
-        _ => "Unknown",
-    }
-    .into()
+    (
+        match day {
+            1 => "Monday",
+            2 => "Tuesday",
+            3 => "Wednesday",
+            4 => "Thursday",
+            5 => "Friday",
+            _ => "Unknown",
+        }
+    ).into()
 }
 
 fn convert_periods(index: usize) -> String {
-    match index {
-        0 => "Before P1",
-        1 => "P1–P2",
-        2 => "P2–P3",
-        3 => "P3–P4",
-        4 => "P4–P5",
-        5 => "P5–P6",
-        6 => "P6–Lunch",
-        7 => "Lunch–P7",
-        8 => "P7–P8",
-        9 => "P8–P9",
-        10 => "P9–P10",
-        11 => "After P10",
-        _ => "Unknown",
-    }
-    .into()
+    (
+        match index {
+            0 => "Before P1",
+            1 => "P1–P2",
+            2 => "P2–P3",
+            3 => "P3–P4",
+            4 => "P4–P5",
+            5 => "P5–P6",
+            6 => "P6–Lunch",
+            7 => "Lunch–P7",
+            8 => "P7–P8",
+            9 => "P8–P9",
+            10 => "P9–P10",
+            11 => "After P10",
+            _ => "Unknown",
+        }
+    ).into()
 }
 fn congestion_color_scale(congestion: u32) -> Color32 {
     match congestion {

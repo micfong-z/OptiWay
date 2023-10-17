@@ -1,4 +1,4 @@
-# path-convertor.py
+# path-converter.py
 # Created by Michael Zhang
 
 import yaml

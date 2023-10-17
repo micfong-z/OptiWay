@@ -3,51 +3,42 @@ pub fn setup_custom_fonts(ctx: &egui::Context) {
 
     fonts.font_data.insert(
         "inter_font".to_owned(),
-        egui::FontData::from_static(include_bytes!("../assets/fonts/Inter-micfong.ttf")),
+        egui::FontData::from_static(include_bytes!("../assets/fonts/Inter-micfong.ttf"))
     );
     fonts.font_data.insert(
         "jetbrains_mono_font".to_owned(),
-        egui::FontData::from_static(include_bytes!("../assets/fonts/JetBrainsMono-Regular.ttf")),
+        egui::FontData::from_static(include_bytes!("../assets/fonts/JetBrainsMono-Regular.ttf"))
     );
     fonts.font_data.insert(
         "source_han_sans_font".to_owned(),
-        egui::FontData::from_static(include_bytes!(
-            "../assets/fonts/SourceHanSansSC-Regular.otf"
-        )),
+        egui::FontData::from_static(include_bytes!("../assets/fonts/SourceHanSansSC-Regular.otf"))
     );
     fonts.font_data.insert(
         "material_design_icons_font".to_owned(),
-        egui::FontData::from_static(include_bytes!("../assets/fonts/MaterialDesignIcons.ttf")),
+        egui::FontData::from_static(include_bytes!("../assets/fonts/MaterialDesignIcons.ttf"))
     );
     fonts.font_data.insert(
         "material_symbols_font".to_owned(),
-        egui::FontData::from_static(include_bytes!(
-            "../assets/fonts/MaterialSymbolsOutlined.ttf"
-        )),
+        egui::FontData::from_static(include_bytes!("../assets/fonts/MaterialSymbolsOutlined.ttf"))
     );
-    fonts
-        .families
+    fonts.families
         .entry(egui::FontFamily::Proportional)
         .or_default()
         .insert(0, "inter_font".to_owned());
-    fonts
-        .families
+    fonts.families
         .entry(egui::FontFamily::Proportional)
         .or_default()
         .insert(1, "source_han_sans_font".to_owned());
-    fonts
-        .families
+    fonts.families
         .entry(egui::FontFamily::Proportional)
         .or_default()
         .insert(2, "material_design_icons_font".to_owned());
-    fonts
-        .families
+    fonts.families
         .entry(egui::FontFamily::Proportional)
         .or_default()
         .insert(3, "material_symbols_font".to_owned());
 
-    fonts
-        .families
+    fonts.families
         .entry(egui::FontFamily::Monospace)
         .or_default()
         .insert(0, "jetbrains_mono_font".to_owned());
@@ -58,13 +49,13 @@ pub fn setup_custom_fonts(ctx: &egui::Context) {
 
 pub fn setup_custom_styles(ctx: &egui::Context) {
     let mut style: egui::Style = (*ctx.style()).clone();
-    style.visuals.window_rounding = 0.0.into();
-    style.visuals.menu_rounding = 0.0.into();
-    style.visuals.widgets.noninteractive.rounding = 0.0.into();
-    style.visuals.widgets.inactive.rounding = 0.0.into();
-    style.visuals.widgets.hovered.rounding = 0.0.into();
-    style.visuals.widgets.active.rounding = 0.0.into();
-    style.visuals.widgets.open.rounding = 0.0.into();
+    style.visuals.window_rounding = (0.0).into();
+    style.visuals.menu_rounding = (0.0).into();
+    style.visuals.widgets.noninteractive.rounding = (0.0).into();
+    style.visuals.widgets.inactive.rounding = (0.0).into();
+    style.visuals.widgets.hovered.rounding = (0.0).into();
+    style.visuals.widgets.active.rounding = (0.0).into();
+    style.visuals.widgets.open.rounding = (0.0).into();
     style.visuals.slider_trailing_fill = true;
     style.visuals.override_text_color = Some(egui::Color32::from_rgb(180, 180, 180));
     // style.animation_time = 1.0;
