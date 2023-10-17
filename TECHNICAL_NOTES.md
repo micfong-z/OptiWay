@@ -118,4 +118,4 @@ The algorithm works as below:
       - note that $c_i$ is not updated here for efficiency, as a minor change in $c_i$ has minor changes to $\sum r_\text{perf}$
 3. **For each batch_size iterations**, we recalculated $c_i$ at each edge, and deduce a new $\sum r_\text{perf}$. If the new $\sum r_\text{perf}$ is greater than that of the last batch, we update the paths.
 
-The full implementation is studed in `multi_agent_path_finding/multi-objective-agent.cpp`. Pratically, we set the number of iterations to a very large number to let user stops it manually.
+The full implementation is studed in `multi_agent_path_finding/multi-objective-agent.cpp`. Pratically, we set the number of iterations to a very large number, letting the user to stop it manually.
