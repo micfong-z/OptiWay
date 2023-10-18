@@ -15,11 +15,11 @@ jobs:
           - target: windows
             runner: windows-latest
             channel: 'beta'  
-            artifact: bundle/
+            artifact: optiway/bundle/
           - target: macos
             runner: macos-latest
             channel: 'stable'
-            artifact: bundle/
+            artifact: optiway/bundle/
     runs-on: ${{ matrix.runner }}
     steps:
     - name: Checkout
@@ -34,11 +34,9 @@ jobs:
     - name: Setup Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.10' 
-    - name: Switch Directory
-      run: cd optiway
+        python-version: '3.10'
     - name: Compile OptiWay
-      run: cargo make bundle
+      run: cd optiway;cargo make bundle
     - name: Zip artifact (Windows)
       if: ${{ matrix.runner == 'windows-latest' }}
       shell: pwsh
