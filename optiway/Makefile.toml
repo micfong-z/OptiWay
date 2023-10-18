@@ -36,6 +36,50 @@ args = ["build", "--release"]
 command = "cargo"
 args = ["run", "--release"]
 
+[tasks.entry-bundle-build]
+env = { OPTIWAY_COMPILE_ENV = "bundle" }
+command = "cargo"
+args = ["build", "--release"] 
+
+[tasks.bundle-script]
+script_runner = "python"
+script_extension = "py"
+script = '''
+import shutil
+import os
+for folder in ['bundle', 'bundle/bin', 'bundle/assets']:
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+    else:
+        shutil.rmtree(folder)
+        os.makedirs(folder)
+    
+shutil.copyfile('bin/floyd.out', 'bundle/bin/floyd.out')
+shutil.copyfile('bin/optimization.out', 'bundle/bin/optimization.out')
+
+for root, dirs, files in os.walk('assets'):
+    for file in files:
+        if file != '.DS_Store':
+            if not os.path.exists(os.path.join('bundle', root)):
+                os.makedirs(os.path.join('bundle', root))
+            shutil.copyfile(os.path.join(root, file), os.path.join('bundle', os.path.join(root, file)))
+
+shutil.copyfile('target/release/optiway', 'bundle/optiway')
+'''
+
+[tasks.bundle-chmod]
+command = "chmod"
+args = ["-R", "+x", "bundle/"]
+
+[tasks.bundle]
+dependencies = [
+    "floyd-release-build",
+    "optimization-release-build",
+    "entry-bundle-build",
+    "bundle-script",
+    "bundle-chmod",
+]
+
 [tasks.run]
 dependencies = [
     "floyd-build",

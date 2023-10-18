@@ -253,12 +253,7 @@ impl Default for OptiWayApp {
             textures: vec![None; 9],
             inactive_brightness: 64,
             projection_coords: serde_yaml
-                ::from_str(
-                    std::fs
-                        ::read_to_string("../assets/projection-coords-flatten.yaml")
-                        .expect("Failed to read projection-coords-flatten.yaml")
-                        .as_str()
-                )
+                ::from_str(include_str!("../assets/projection-coords-flatten.yaml"))
                 .unwrap(),
             active_path_color: Color32::from_rgb(0xec, 0x6f, 0x27),
             inactive_path_color: Color32::from_gray(0x61),
@@ -331,9 +326,7 @@ impl Default for OptiWayApp {
             show_congestion_point: true,
             show_pi_window: false,
             shortest_paths_json: serde_json
-                ::from_reader::<_, HashMap<String, String>>(
-                    File::open("./assets/shortest_paths.json").unwrap()
-                )
+                ::from_str(include_str!("../assets/shortest_paths.json"))
                 .unwrap(),
             performance_indices_shortest: {
                 let mut performance_indices = HashMap::new();
@@ -359,11 +352,8 @@ impl Default for OptiWayApp {
             path_distances: Arc::new(
                 Mutex::new({
                     let mut path_distances = HashMap::new();
-                    // read paths.txt in the format [room1] [room2] [distance] [(ignore)]
-                    let paths_file = File::open("./assets/paths.txt").unwrap();
-                    let paths_file = std::io::BufReader::new(paths_file);
-                    for line in paths_file.lines() {
-                        let line = line.unwrap();
+                    for line in include_str!("../assets/paths.txt").lines() {
+                        let line = line.to_owned();
                         let mut line = line.split(' ');
                         let room1 = line.next().unwrap().to_owned();
                         let room2 = line.next().unwrap().to_owned();
@@ -559,7 +549,6 @@ impl OptiWayApp {
                             if ui.button("Select route file").clicked() {
                                 let file = FileDialog::new()
                                     .add_filter("JSON", &["json"])
-                                    .set_directory("../")
                                     .pick_file();
                                 if let Some(file) = file {
                                     self.param_filename = file
@@ -1798,11 +1787,11 @@ impl OptiWayApp {
                     .lock()
                     .unwrap();
                 ui.horizontal(|ui| {
-                    if ui.selectable_label(self.show_pi_shortest, "shortest Path").clicked() {
+                    if ui.selectable_label(self.show_pi_shortest, "Shortest").clicked() {
                         self.show_pi_shortest = true;
                     }
 
-                    if ui.selectable_label(!self.show_pi_shortest, "Optimized Path").clicked() {
+                    if ui.selectable_label(!self.show_pi_shortest, "Optimized").clicked() {
                         self.show_pi_shortest = false;
                     }
                 });
@@ -2122,10 +2111,7 @@ impl eframe::App for OptiWayApp {
                         "Follow the order of the buttons from top to bottom to complete the process."
                     );
                     if ui.button("Import timetable").clicked() {
-                        let file = FileDialog::new()
-                            .add_filter("JSON", &["json"])
-                            .set_directory("../")
-                            .pick_file();
+                        let file = FileDialog::new().add_filter("JSON", &["json"]).pick_file();
                         if let Some(file) = file {
                             self.timetable_file_info.filename = file
                                 .file_name()
@@ -2263,10 +2249,7 @@ impl eframe::App for OptiWayApp {
                     ui.separator();
                     ui.heading("Export");
                     if ui.button("Export shortest routes").clicked() {
-                        let file = FileDialog::new()
-                            .add_filter("JSON", &["json"])
-                            .set_directory("../")
-                            .save_file();
+                        let file = FileDialog::new().add_filter("JSON", &["json"]).save_file();
                         if let Some(file) = file {
                             let mut file = File::create(file).unwrap();
                             let student_routes = self.student_routes_shortest.lock().unwrap();
@@ -2278,10 +2261,7 @@ impl eframe::App for OptiWayApp {
                     let enabled = self.student_routes_optimized.lock().unwrap().is_some();
                     ui.add_enabled_ui(enabled, |ui| {
                         if ui.button("Export optimized routes").clicked() {
-                            let file = FileDialog::new()
-                                .add_filter("JSON", &["json"])
-                                .set_directory("../")
-                                .save_file();
+                            let file = FileDialog::new().add_filter("JSON", &["json"]).save_file();
                             if let Some(file) = file {
                                 let mut file = File::create(file).unwrap();
                                 let student_routes = self.student_routes_optimized.lock().unwrap();
@@ -2485,7 +2465,7 @@ impl eframe::App for OptiWayApp {
                         load_image_from_path(
                             Path::new(
                                 format!(
-                                    "../assets/projection-transparent/projection_{i}F.png"
+                                    "assets/projection-transparent/projection_{i}F.png"
                                 ).as_str()
                             )
                         ).unwrap(),
@@ -2615,7 +2595,7 @@ impl eframe::App for OptiWayApp {
                         self.path_display == PathDisplay::Optimized &&
                         self.student_routes_optimized.lock().unwrap().is_some()
                     {
-                        for (room, congestion) in self.congestion_point_data
+                        for (room, congestion) in self.congestion_point_data_opt
                             .lock()
                             .unwrap()
                             .clone()
@@ -2639,7 +2619,7 @@ impl eframe::App for OptiWayApp {
                             }
                         }
                     } else {
-                        for (room, congestion) in self.congestion_point_data_opt
+                        for (room, congestion) in self.congestion_point_data
                             .lock()
                             .unwrap()
                             .clone()

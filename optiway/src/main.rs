@@ -1,8 +1,15 @@
 #![warn(clippy::all, rust_2018_idioms)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+#[cfg(compile_env = "bundle")]
+use std::env;
+
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result<()> {
+    #[cfg(compile_env = "bundle")]
+    {
+        env::set_current_dir(env::current_exe().unwrap().parent().unwrap()).unwrap();
+    }
     env_logger::init();
 
     let native_options = eframe::NativeOptions::default();

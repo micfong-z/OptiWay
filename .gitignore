@@ -4,6 +4,11 @@
 .idea
 optiway/target
 optiway/bin
+optiway/bundle
 *.out
 multi_agent_path_finding/output
-**/routes.json
+optiway/bin/routes.json_1.json
+optiway/bin/routes.json_2.json
+optiway/bin/routes.json_3.json
+optiway/bin/routes.json_4.json
+optiway/bin/routes.json_5.json
