@@ -39,9 +39,9 @@ args = ["run", "--release"]
 [tasks.entry-bundle-build]
 env = { OPTIWAY_COMPILE_ENV = "bundle" }
 command = "cargo"
-args = ["build", "--release"] 
+args = ["build", "--release", "-Z", "unstable-options", "--out-dir", "bundle/"] 
 
-[tasks.bundle-script]
+[tasks.bundle-clean-dirs]
 script_runner = "python"
 script_extension = "py"
 script = '''
@@ -53,7 +53,14 @@ for folder in ['bundle', 'bundle/bin', 'bundle/assets']:
     else:
         shutil.rmtree(folder)
         os.makedirs(folder)
-    
+'''
+
+[tasks.bundle-script]
+script_runner = "python"
+script_extension = "py"
+script = '''
+import shutil
+import os
 shutil.copyfile('bin/floyd.out', 'bundle/bin/floyd.out')
 shutil.copyfile('bin/optimization.out', 'bundle/bin/optimization.out')
 
@@ -64,7 +71,7 @@ for root, dirs, files in os.walk('assets'):
                 os.makedirs(os.path.join('bundle', root))
             shutil.copyfile(os.path.join(root, file), os.path.join('bundle', os.path.join(root, file)))
 
-shutil.copyfile('target/release/optiway', 'bundle/optiway')
+os.remove('bundle/liboptiway.rlib')
 '''
 
 [tasks.bundle-chmod]
@@ -73,6 +80,7 @@ args = ["-R", "+x", "bundle/"]
 
 [tasks.bundle]
 dependencies = [
+    "bundle-clean-dirs",
     "floyd-release-build",
     "optimization-release-build",
     "entry-bundle-build",

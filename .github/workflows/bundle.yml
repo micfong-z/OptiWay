@@ -1,0 +1,61 @@
+name: Bundle
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+jobs:
+  bundle:
+    name: Bundle
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [windows, macos]
+        include:
+          - target: windows
+            runner: windows-latest
+            channel: 'beta'  
+            artifact: bundle/
+          - target: macos
+            runner: macos-latest
+            channel: 'stable'
+            artifact: bundle/
+    runs-on: ${{ matrix.runner }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Setup Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: nightly
+        override: true
+    - name: Setup Cargo Make
+      uses: davidB/rust-cargo-make@v1
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10' 
+    - name: Switch Directory
+      run: cd optiway
+    - name: Compile OptiWay
+      run: cargo make bundle
+    - name: Zip artifact (Windows)
+      if: ${{ matrix.runner == 'windows-latest' }}
+      shell: pwsh
+      run: Compress-Archive "${{ matrix.artifact }}" "optiway-${{ matrix.target }}.zip"
+    - name: Zip artifact (macOS)
+      if: ${{ matrix.runner == 'macos-latest' }}
+      shell: bash
+      run: tar -C "$(dirname "${{ matrix.artifact }}")" -czf "optiway-${{ matrix.target }}.tar.gz" "$(basename "${{ matrix.artifact }}")"
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: optiway-${{ matrix.target }}
+        path: optiway-${{ matrix.target }}.*
+    - uses: ncipollo/release-action@v1
+      with:
+        artifacts: optiway-${{ matrix.target }}.*
+        token: ${{ secrets.GITHUB_TOKEN }}
+        allowUpdates: true
+        draft: true
+  
