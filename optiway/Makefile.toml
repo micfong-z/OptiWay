@@ -1,5 +1,5 @@
 [env]
-G_PLUS_PLUS = "g++-13"
+G_PLUS_PLUS = "g++"
 
 [tasks.floyd-build]
 command = "${G_PLUS_PLUS}"
@@ -12,6 +12,10 @@ args = ["../multi_agent_path_finding/floyd.cpp", "-o", "bin/floyd.out", "-std=c+
 command = "${G_PLUS_PLUS}"
 args = ["../multi_agent_path_finding/floyd.cpp", "-o", "bin/floyd.out", "-std=c++17", "-O3", "-Xlinker", "-ld_classic"]
 
+[tasks.floyd-release-build-x64]
+command = "${G_PLUS_PLUS}"
+args = ["../multi_agent_path_finding/floyd.cpp", "-o", "bin/floyd.out", "-std=c++17", "-O3", "-arch", "x86_64", "-Xlinker", "-ld_classic"]
+
 [tasks.optimization-build]
 command = "${G_PLUS_PLUS}"
 args = ["../multi_agent_path_finding/multi-objective-agent.cpp", "-o", "bin/optimization.out", "-std=c++17", "-O0", "-Xlinker", "-ld_classic"]
@@ -19,6 +23,10 @@ args = ["../multi_agent_path_finding/multi-objective-agent.cpp", "-o", "bin/opti
 [tasks.optimization-release-build]
 command = "${G_PLUS_PLUS}"
 args = ["../multi_agent_path_finding/multi-objective-agent.cpp", "-o", "bin/optimization.out", "-std=c++17", "-O3", "-Xlinker", "-ld_classic"]
+
+[tasks.optimization-release-build-x64]
+command = "${G_PLUS_PLUS}"
+args = ["../multi_agent_path_finding/multi-objective-agent.cpp", "-o", "bin/optimization.out", "-std=c++17", "-O3", "-arch", "x86_64", "-Xlinker", "-ld_classic"]
 
 [tasks.entry-run]
 command = "cargo"
@@ -40,6 +48,11 @@ args = ["run", "--release"]
 env = { OPTIWAY_COMPILE_ENV = "bundle" }
 command = "cargo"
 args = ["build", "--release", "-Z", "unstable-options", "--out-dir", "bundle/"] 
+
+[tasks.entry-bundle-build-x64]
+env = { OPTIWAY_COMPILE_ENV = "bundle" }
+command = "cargo"
+args = ["build", "--release", "-Z", "unstable-options", "--out-dir", "bundle/", "--target", "x86_64-apple-darwin"]
 
 [tasks.bundle-clean-dirs]
 script_runner = "python"
@@ -84,6 +97,16 @@ dependencies = [
     "floyd-release-build",
     "optimization-release-build",
     "entry-bundle-build",
+    "bundle-script",
+    "bundle-chmod",
+]
+
+[tasks.bundle-x64]
+dependencies = [
+    "bundle-clean-dirs",
+    "floyd-release-build-x64",
+    "optimization-release-build-x64",
+    "entry-bundle-build-x64",
     "bundle-script",
     "bundle-chmod",
 ]

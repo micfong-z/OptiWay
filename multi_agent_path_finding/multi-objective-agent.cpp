@@ -328,7 +328,7 @@ void iterMultiple(PathPQ& paths, double& sum_rperf,
         // A single iteration
         iter(paths, sum_rperf, congestion, graph, last_start, last_end, temp);
 
-        if (i % BATCH_SIZE | i == 0)
+        if (i % BATCH_SIZE | (i == 0))
             cout << "ITER " << i << " APPR " << sum_rperf << endl;
         else {  // When the batch size is met
             for (const auto& [node, edges] : graph) {
@@ -494,7 +494,7 @@ void iterSingleDay(const int day, json& route_tables, const Graph& graph,
                  last_start[period], last_end[period], temp[period]);
             prev_best_rperf[period] = min(sum_rperf[period], prev_best_rperf[period]);
 
-            if (i % BATCH_SIZE | i == 0) {
+            if (i % BATCH_SIZE | (i == 0)) {
                 // cout << fixed << setprecision(0) << "0 " << i << ' ' << day << ' ' <<
                 // period << ' ' << sum_rperf[period] << ' ' << prev_best_rperf[period] <<
                 // endl;
