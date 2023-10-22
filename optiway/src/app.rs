@@ -30,7 +30,6 @@ use egui::{
 };
 use num_format::{ Locale, ToFormattedString };
 use rfd::FileDialog;
-use signal_child::Signalable;
 
 use crate::{ md_icons::material_design_icons, setup_custom_fonts, setup_custom_styles };
 
@@ -675,7 +674,7 @@ impl OptiWayApp {
                                                         .clone() == OptimizationStatus::AbortSignal
                                                 {
                                                     opt_command
-                                                        .interrupt()
+                                                        .kill()
                                                         .expect(
                                                             "Failed to interrupt optimization algorithm"
                                                         );
