@@ -143,5 +143,5 @@ Note that the program should **not** output a line at `iteration=0`.
 
 - `-f [path]` The source JSON file path.
 - `-b [number]` The size of each batch.
-- `-i [number]` The number of iterations each time.
+- `-s [number]` The number of iterations per save.
 - `-d [number]` The day to evaluate on.
