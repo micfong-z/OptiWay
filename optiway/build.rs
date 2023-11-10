@@ -8,10 +8,11 @@ fn main() {
     println!("cargo:rerun-if-changed=src/demo.cc");
     println!("cargo:rerun-if-changed=include/demo.h");
 
-    CFG.include_prefix = "optiway/include";
-
     cxx_build::bridge("src/ffi.rs")
+        .std("c++20")
+        .include("include")
         .file("src/floyd.cpp")
+        .file("src/utilities.cpp")
         .file("src/multi-objective-agent.cpp")
-        .flag_if_supported("-std=c++20");
+        .compile("libfloyd");
 }

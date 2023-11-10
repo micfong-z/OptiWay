@@ -6,16 +6,17 @@
 #include <unordered_map>
 #include <vector>
 
-#include "../include/json.hpp"
-#include "../include/floyd.hpp"
-using json = nlohmann::json;
+#include "floyd.hpp"
+#include "json.hpp"
+#include "rust/cxx.h"
+#include "utilities.hpp"
 
 using namespace std;
 
-Graph createSchoolGraph(const string& file_path) {
+std::unique_ptr<Graph> createSchoolGraph(rust::Str file_path) {
     /* Construct the school's layout graph from the path.txt */
-    Graph graph;
-    ifstream file(file_path);
+    std::unique_ptr<Graph> graph = std::make_unique<Graph>();
+    ifstream file(file_path.data());
 
     if (!file.is_open()) {
         cerr << "Failed to open the file." << endl;
@@ -34,8 +35,8 @@ Graph createSchoolGraph(const string& file_path) {
         Edge edge1 = {node2, distance, type};
         Edge edge2 = {node1, distance, type};
 
-        graph[node1].push_back(edge1);
-        graph[node2].push_back(edge2);  // Because it's an undirected graph
+		(*graph)[node1].push_back(edge1);
+		(*graph)[node2].push_back(edge2);   // Because it's an undirected graph
     }
 
     file.close();
@@ -113,15 +114,15 @@ vector<string> reconstructPath(const PredecessorMatrix& pred, const string& star
     return path;
 }
 
-json getRoutesfromTimetable(const json& timetables, const Graph& graph,
-                            const json& shortest_paths) {
+std::unique_ptr<Json> getRoutesfromTimetable(const Json& timetables, const Graph& graph,
+                            const Json& shortest_paths) {
     /* Obtain the routes as a json file from the timetables's json*/
-    json routes;
+	std::unique_ptr<Json> routes = std::make_unique<Json>();
 
     for (const auto& [student, timetable] : timetables.items()) {
-        json week;
+        Json week;
         for (const auto& [day, classes] : timetable.items()) {
-            json today;
+            Json today;
 
             // Start of the day, going from G_floor to the first class
             string path_str = shortest_paths["G" + classes["1"].get<string>()];
@@ -188,7 +189,7 @@ json getRoutesfromTimetable(const json& timetables, const Graph& graph,
             }
             week[day] = today;
         }
-        routes[student] = week;
+		(*routes)[student] = week;
     }
 
     return routes;
@@ -202,7 +203,7 @@ void generate_all_paths(const Graph& graph) {
     initializeDistanceAndPredecessorMatrices(graph, dist, pred);
     floydWarshall(graph, dist, pred);
 
-    json routes;
+    Json routes;
     for (const auto [room1, _] : graph) {
         for (const auto [room2, __] : graph) {
             if (room1[0] != 'A' && room1[0] != 'B' && room1[0] != 'G') continue;
@@ -231,7 +232,7 @@ void generate_all_floyd_distances(const Graph& graph) {
     initializeDistanceAndPredecessorMatrices(graph, dist, pred);
     floydWarshall(graph, dist, pred);
 
-    json distances;
+    Json distances;
     for (const auto [room1, _] : graph) {
         for (const auto [room2, __] : graph) {
             if (room1[0] != 'A' && room1[0] != 'B' && room1[0] != 'G') continue;
@@ -251,50 +252,54 @@ void generate_all_floyd_distances(const Graph& graph) {
     }
 }
 
-int main() {
-    string timetable_path;
+// int main() {
+// 	std::unique_ptr<Json> hello = makeJson("hello");
 
-    ios::sync_with_stdio(false);
-    cin.tie(0);
+//     string timetable_path;
 
-    // general input: the path to the time table json
-    // cin >> timetable_path;  // "../assets/timetable_0.json"
-    getline(cin, timetable_path);
+//     ios::sync_with_stdio(false);
+//     cin.tie(0);
 
-    // parse the JSON file
-    ifstream input_file(timetable_path);
-    if (!input_file.is_open()) {
-        cerr << "Failed to open the timetable file." << endl;
-        return 1;
-    }
+//     // general input: the path to the time table json
+//     // cin >> timetable_path;  // "../assets/timetable_0.json"
+//     getline(cin, timetable_path);
 
-    json timetables;
-    input_file >> timetables;
-    input_file.close();
+//     // parse the JSON file
+//     ifstream input_file(timetable_path);
+//     if (!input_file.is_open()) {
+//         cerr << "Failed to open the timetable file." << endl;
+//         return 1;
+//     }
 
-    Graph graph = createSchoolGraph("../assets/paths.txt");
-    // generate_all_paths(graph);
+//     Json timetables;
+//     input_file >> timetables;
+//     input_file.close();
 
-    ifstream paths_file("../assets/shortest_paths.json");
-    if (!paths_file.is_open()) {
-        cerr << "Failed to open shortest_paths.json" << endl;
-        return 1;
-    }
+// 	rust::String filename{"../assets/paths.txt"};
+//     std::unique_ptr<Graph> graph = createSchoolGraph(filename);
+//     // generate_all_paths(graph);
 
-    json shortest_paths;
-    paths_file >> shortest_paths;
-    paths_file.close();
+//     ifstream paths_file("../assets/shortest_paths.json");
+//     if (!paths_file.is_open()) {
+//         cerr << "Failed to open shortest_paths.json" << endl;
+//         return 1;
+//     }
 
-    json routes = getRoutesfromTimetable(timetables, graph, shortest_paths);
+//     Json shortest_paths;
+//     paths_file >> shortest_paths;
+//     paths_file.close();
 
-    ofstream file("routes.json");
-    if (file.is_open()) {
-        file << routes.dump();  // faster i/o
-        file.close();
-        cout << "JSON data written to routes.json successfully." << endl;
-    } else {
-        cerr << "Failed to open the file for writing." << endl;
-    }
+//     std::unique_ptr<Json> routes = getRoutesfromTimetable(timetables, *graph,
+//     shortest_paths);
 
-    return 0;
-}
+//     ofstream file("routes.json");
+//     if (file.is_open()) {
+//         file << (*routes).dump();  // faster i/o
+//         file.close();
+//         cout << "JSON data written to routes.json successfully." << endl;
+//     } else {
+//         cerr << "Failed to open the file for writing." << endl;
+//     }
+
+//     return 0;
+// }
