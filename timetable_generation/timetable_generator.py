@@ -39,9 +39,10 @@ Example:
 import random
 import copy
 import json
+import typing
 
 from enum import Enum, auto
-from typing import Dict, Set, List
+from typing import Dict, Set, List, Union, Callable, Optional
 
 
 class Grade(Enum):
@@ -49,11 +50,16 @@ class Grade(Enum):
     G2 = auto()
 
 
+class EmptyListError(Exception):
+    pass
+
+
 class TimetableGenerator:
     glevel_elective_freq: Dict[str, int]
     floor_map: Dict[str, int]
     avail_rooms: Dict[int, Set[int]]
     glevel_set_map: List[Dict[int, List[str]]]
+
     # TODO: Type `filled_rooms`, and `time_table`
 
     def __init__(self):
@@ -81,13 +87,13 @@ class TimetableGenerator:
         # all the available classrooms
         self.avail_rooms = {
             2: set(range(201, 242))
-            - {203, 209, 213, 218, 229, 230, 232, 234, 236, 237, 238, 240},
+               - {203, 209, 213, 218, 229, 230, 232, 234, 236, 237, 238, 240},
             3: set(range(301, 334)) - {303, 304, 309, 317, 321, 322, 328},
             4: set(range(401, 434)) - {403, 404, 412, 413, 418, 420, 422, 428},
             5: set(range(501, 535)) - {503, 512, 517, 518, 520, 527, 528, 529},
             6: set(range(601, 632)) - {603, 614, 615, 620, 623, 625, 626, 627},
             7: set(range(701, 734))
-            - {703, 714, 716, 720, 723, 725, 727, 729, 730, 732},
+               - {703, 714, 716, 720, 723, 725, 727, 729, 730, 732},
             8: set(range(801, 822)) - {808, 810, 813, 816, 818, 820},
         }
         # the dicts to map glevel schedule set to period number
@@ -115,13 +121,13 @@ class TimetableGenerator:
     @staticmethod
     def map_building(room: int) -> str:
         if (
-            200 < room < 221
-            or 300 < room < 320
-            or 400 < room < 421
-            or 500 < room < 521
-            or 600 < room < 618
-            or 700 < room < 717
-            or 800 < room < 811
+                200 < room < 221
+                or 300 < room < 320
+                or 400 < room < 421
+                or 500 < room < 521
+                or 600 < room < 618
+                or 700 < room < 717
+                or 800 < room < 811
         ):
             return "A"
         else:
@@ -209,12 +215,17 @@ class TimetableGenerator:
                         rooms[course] = "G"
                         continue
                 # divide by the current filled rooms, use mod because the core slots for g1 are elective slots for g2
+                choices = list(
+                    self.avail_rooms[floor]
+                    - filled_room[floor]
+                    - self.filled_rooms[(index + 4) % 8][floor]
+                )
+
+                if len(choices) == 0:
+                    raise EmptyListError
+
                 room = random.choice(
-                    list(
-                        self.avail_rooms[floor]
-                        - filled_room[floor]
-                        - self.filled_rooms[(index + 4) % 8][floor]
-                    )
+                   choices
                 )
                 rooms[course] = self.map_building(room) + str(room)
                 filled_room[floor].add(room)
@@ -421,14 +432,18 @@ class TimetableGenerator:
                         rooms[course] = "G"
                         continue
                 # divide by the current filled rooms, use mod because the core slots for g1 are elective slots for g2
-                room = random.choice(
-                    list(
-                        self.avail_rooms[floor]
-                        - filled_timetable[day1][p11]
-                        - filled_timetable[day2][p21]
-                        - filled_timetable[day3][p31]
-                    )
+
+                choices = list(
+                    self.avail_rooms[floor]
+                    - filled_timetable[day1][p11]
+                    - filled_timetable[day2][p21]
+                    - filled_timetable[day3][p31]
                 )
+
+                if len(choices) == 0:
+                    raise EmptyListError
+
+                room = random.choice(choices)
                 rooms[course] = self.map_building(room) + str(room)
                 filled_room[floor].add(room)
             filled_rooms.append(filled_room)
@@ -550,15 +565,19 @@ class TimetableGenerator:
                         rooms[course] = "G"
                         continue
                 # divide by the current filled rooms, use mod because the core slots for g1 are elective slots for g2
-                room = random.choice(
-                    list(
-                        self.avail_rooms[floor]
-                        - filled_timetable[day1][p11]
-                        - filled_timetable[day2][p21]
-                        - filled_timetable[day3][p31]
-                        - filled_rooms[index][floor]
-                    )
-                )  # minus the as time slots as well
+                choices = list(
+                    self.avail_rooms[floor]
+                    - filled_timetable[day1][p11]
+                    - filled_timetable[day2][p21]
+                    - filled_timetable[day3][p31]
+                    - filled_rooms[index][floor]
+                )
+
+                if len(choices) == 0:
+                    raise EmptyListError
+
+                room = random.choice(choices)
+                # minus the as time slots as well
                 rooms[course] = self.map_building(room) + str(room)
                 filled_room[floor].add(room)
 
@@ -635,12 +654,12 @@ class TimetableGenerator:
                         flag = False
                         break
                     if (
-                        int(student_list[i]) // 1000 == g1_offset // 1000
-                        or int(student_list[i]) // 1000 == g2_offset // 1000
+                            int(student_list[i]) // 1000 == g1_offset // 1000
+                            or int(student_list[i]) // 1000 == g2_offset // 1000
                     ):
                         for day in range(1, 6):
                             self.time_table[student_list[i]][str(day)]["5"] = (
-                                self.map_building(room) + str(room)
+                                    self.map_building(room) + str(room)
                             )
                     else:
                         gt_day = random.choice(["1", "2", "4", "5"])
@@ -648,17 +667,17 @@ class TimetableGenerator:
                         gt_room = random.choice(list(self.avail_rooms[gt_floor]))
                         if gt_day != "5":
                             self.time_table[student_list[i]][gt_day]["5"] = (
-                                self.map_building(gt_room) + str(gt_room)
+                                    self.map_building(gt_room) + str(gt_room)
                             )
                             self.time_table[student_list[i]][gt_day]["6"] = (
-                                self.map_building(gt_room) + str(gt_room)
+                                    self.map_building(gt_room) + str(gt_room)
                             )
                         else:
                             self.time_table[student_list[i]][gt_day]["7"] = (
-                                self.map_building(gt_room) + str(gt_room)
+                                    self.map_building(gt_room) + str(gt_room)
                             )
                             self.time_table[student_list[i]][gt_day]["8"] = (
-                                self.map_building(gt_room) + str(gt_room)
+                                    self.map_building(gt_room) + str(gt_room)
                             )
                         self.time_table[student_list[i]]["3"]["5"] = self.map_building(
                             room
@@ -672,12 +691,53 @@ class TimetableGenerator:
         return self.time_table
 
 
+def generate_timetable(
+        grade: Optional[Grade],
+        fn: Union[
+            Callable[[Grade], Dict[str, Dict[str, Dict[str, str]]]],
+            Callable[[], Dict[str, Dict[str, Dict[str, str]]]],
+        ],
+        generator: TimetableGenerator
+):
+    counter: int = 0
+    needs_repeat: bool = False
+    try:
+        if grade is None:
+            timetable = fn()
+        else:
+            timetable = fn(grade)
+    except EmptyListError:
+        needs_repeat = True
+
+    if needs_repeat:
+        while True and counter < 100:
+            try:
+                if grade is None:
+                    timetable = fn()
+                else:
+                    timetable = fn(grade)
+                break
+            except EmptyListError:
+                print(f"Failed to generate a timetable using function `{fn.__name__}`, retrying...")
+                # Does this even have any effect?
+            generator = TimetableGenerator()
+            counter += 1
+
+    if counter >= 100:
+        raise StopIteration(f"Failed to generate a timetable using function `{fn.__name__}`")
+    print(f"Generated a timetable using function `{fn.__name__}`")
+    return timetable
+
+
 if __name__ == "__main__":
-    # Need to generate multiple times so that the rooms not crash, therefore creating no errors
     generator = TimetableGenerator()
-    time_table1 = generator.generate_g_level(Grade.G1)
-    time_table2 = generator.generate_g_level(Grade.G2)
-    time_table3 = generator.generate_as_al_level()
+    try:
+        time_table1 = generate_timetable(Grade.G1, generator.generate_g_level, generator)
+        time_table2 = generate_timetable(Grade.G2, generator.generate_g_level, generator)
+        time_table3 = generate_timetable(None, generator.generate_as_al_level, generator)
+    except StopIteration as e:
+        print(e)
+        exit(1)
     generator.add_pshe_gt()
 
     with open("timetable_with_gt_0.json", "w") as file:
