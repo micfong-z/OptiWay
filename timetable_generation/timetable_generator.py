@@ -40,8 +40,22 @@ import random
 import copy
 import json
 
+from enum import Enum, auto
+from typing import Dict, Set, List
+
+
+class Grade(Enum):
+    G1 = auto()
+    G2 = auto()
+
 
 class TimetableGenerator:
+    glevel_elective_freq: Dict[str, int]
+    floor_map: Dict[str, int]
+    avail_rooms: Dict[int, Set[int]]
+    glevel_set_map: List[Dict[int, List[str]]]
+    # TODO: Type `filled_rooms`, and `time_table`
+
     def __init__(self):
         # Init Data #
         # the frequency for elective classes
@@ -51,7 +65,7 @@ class TimetableGenerator:
             "Hum": 14,
             "Enr": 6,
             "Lan": 5,
-            "Sci": 25
+            "Sci": 25,
         }
         # the dict to map class to floor number
         self.floor_map = {
@@ -66,13 +80,15 @@ class TimetableGenerator:
         }
         # all the available classrooms
         self.avail_rooms = {
-            2: set(range(201, 242)) - {203, 209, 213, 218, 229, 230, 232, 234, 236, 237, 238, 240},
+            2: set(range(201, 242))
+            - {203, 209, 213, 218, 229, 230, 232, 234, 236, 237, 238, 240},
             3: set(range(301, 334)) - {303, 304, 309, 317, 321, 322, 328},
             4: set(range(401, 434)) - {403, 404, 412, 413, 418, 420, 422, 428},
             5: set(range(501, 535)) - {503, 512, 517, 518, 520, 527, 528, 529},
             6: set(range(601, 632)) - {603, 614, 615, 620, 623, 625, 626, 627},
-            7: set(range(701, 734)) - {703, 714, 716, 720, 723, 725, 727, 729, 730, 732},
-            8: set(range(801, 822)) - {808, 810, 813, 816, 818, 820}
+            7: set(range(701, 734))
+            - {703, 714, 716, 720, 723, 725, 727, 729, 730, 732},
+            8: set(range(801, 822)) - {808, 810, 813, 816, 818, 820},
         }
         # the dicts to map glevel schedule set to period number
         # formate: "<day><1st period><2nd period>"
@@ -80,29 +96,38 @@ class TimetableGenerator:
             0: ["1_7_8", "4_9_10"],
             1: ["1_9_10", "3_3_4"],
             2: ["2_1_2", "5_3_4"],
-            3: ["2_3_4", "5_7_8"]
+            3: ["2_3_4", "5_7_8"],
         }
         glevel_elect_set_map = {
             0: ["1_1_2", "4_3_4"],
             1: ["1_3_4", "2_9_10"],
             2: ["2_7_8", "4_7_8"],
-            3: ["3_1_2", "5_1_2"]
+            3: ["3_1_2", "5_1_2"],
         }
         self.glevel_set_map = [glevel_core_set_map, glevel_elect_set_map]
         # the currently filled rooms
         self.filled_rooms = [
-            dict(zip(range(2, 9), [set() for _ in range(2, 9)])) for _ in range(9)]
+            dict(zip(range(2, 9), [set() for _ in range(2, 9)])) for _ in range(9)
+        ]
         self.time_table = {}
 
     # map rooms into different buildings
     @staticmethod
-    def map_building(room):
-        if 200 < room < 221 or 300 < room < 320 or 400 < room < 421 or 500 < room < 521 or 600 < room < 618 or 700 < room < 717 or 800 < room < 811:
+    def map_building(room: int) -> str:
+        if (
+            200 < room < 221
+            or 300 < room < 320
+            or 400 < room < 421
+            or 500 < room < 521
+            or 600 < room < 618
+            or 700 < room < 717
+            or 800 < room < 811
+        ):
             return "A"
         else:
             return "B"
 
-    def generate_g_level(self, grade):
+    def generate_g_level(self, grade: Grade) -> Dict[str, Dict[str, Dict[str, str]]]:
         """
         Generate G-level classes
         1: Find the total number of classes for each of the categories: Extra(1F), Bus(2F), Hum(3F), Enr(4F), Lan(5F), Sci(6F)
@@ -147,7 +172,7 @@ class TimetableGenerator:
         """
         # Procedures #
         # 3 distribute timeslots for each course, each slot only needs 20 courses
-        core_slots = [[] for _ in range(4)]
+        core_slots: List[List[str]] = [[] for _ in range(4)]
         # assign the core classes
         for core in range(20):
             core_classes = ["Enr", "Chi", "Eng", "Sci"]
@@ -166,7 +191,7 @@ class TimetableGenerator:
                     avail_slots.remove(slot)
 
         # 4 distribute the rooms for each course
-        if grade == "G1":
+        if grade is Grade.G1:
             slots = core_slots + elect_slots
         else:
             slots = elect_slots + core_slots
@@ -184,8 +209,13 @@ class TimetableGenerator:
                         rooms[course] = "G"
                         continue
                 # divide by the current filled rooms, use mod because the core slots for g1 are elective slots for g2
-                room = random.choice(list(
-                    self.avail_rooms[floor] - filled_room[floor] - self.filled_rooms[(index + 4) % 8][floor]))
+                room = random.choice(
+                    list(
+                        self.avail_rooms[floor]
+                        - filled_room[floor]
+                        - self.filled_rooms[(index + 4) % 8][floor]
+                    )
+                )
                 rooms[course] = self.map_building(room) + str(room)
                 filled_room[floor].add(room)
             filled_rooms.append(filled_room)
@@ -197,12 +227,11 @@ class TimetableGenerator:
                 # [514, 519, 521, 523, 530, 531, 532, 533, 534, 502, 504, 508, 511]
 
         # 5 distribute each student's list of courses taken
-        if grade == "G1":
+        if grade is Grade.G1:
             offset = 23000
         else:
             offset = 22000
-        students = dict(zip(range(offset+1, offset+501),
-                        [[] for _ in range(500)]))
+        students = dict(zip(range(offset + 1, offset + 501), [[] for _ in range(500)]))
         # assign each student to a core class (#0 - 19)
         # track the number of students in each core class
         core_counts = [0 for _ in range(20)]
@@ -210,7 +239,13 @@ class TimetableGenerator:
         for student in students:
             core = random.choice(cores)
             students[student].extend(
-                [f"Enr_core_{core}", f"Chi_core_{core}", f"Eng_core_{core}", f"Sci_core_{core}"])
+                [
+                    f"Enr_core_{core}",
+                    f"Chi_core_{core}",
+                    f"Eng_core_{core}",
+                    f"Sci_core_{core}",
+                ]
+            )
             core_counts[core] += 1
             if core_counts[core] == 25:
                 cores.remove(core)
@@ -218,8 +253,7 @@ class TimetableGenerator:
         elect_slots_copy = copy.deepcopy(elect_slots)
         # assign each student to an elective class
         # track the filled courses for each slot
-        filled_courses = {
-            i: dict(zip(elect_slots_copy[i], [0] * 20)) for i in range(4)}
+        filled_courses = {i: dict(zip(elect_slots_copy[i], [0] * 20)) for i in range(4)}
         for student in students:
             for i, slot in enumerate(elect_slots_copy):
                 course = random.choice(slot)
@@ -229,12 +263,13 @@ class TimetableGenerator:
                     elect_slots_copy[i].remove(course)
 
         # 6 projection back
-        timetable = {str(i): {str(j): {str(k): "G" for k in range(1, 11)}
-                              for j in range(1, 6)} for i in range(offset+1, offset+501)}
+        timetable: Dict[str, Dict[str, Dict[str, str]]] = {
+            str(i): {str(j): {str(k): "G" for k in range(1, 11)} for j in range(1, 6)}
+            for i in range(offset + 1, offset + 501)
+        }
         # additional slot to hold the extra english and PE class
-        filled_rooms.append(
-            dict(zip(range(2, 9), [set() for _ in range(2, 9)])))
-        if grade == "G1":
+        filled_rooms.append(dict(zip(range(2, 9), [set() for _ in range(2, 9)])))
+        if grade is Grade.G1:
             core_set = 0
             elect_set = 1
         else:
@@ -244,38 +279,38 @@ class TimetableGenerator:
             for course in student[:4]:  # for the core classes
                 for index, slot in enumerate(core_slots):
                     if course in slot:
-                        day, p1, p2 = self.glevel_set_map[core_set][index][0].split(
-                            "_")
+                        day, p1, p2 = self.glevel_set_map[core_set][index][0].split("_")
                         timetable[str(k)][day][p1] = rooms[course]
                         timetable[str(k)][day][p2] = rooms[course]
-                        day, p1, p2 = self.glevel_set_map[core_set][index][1].split(
-                            "_")
+                        day, p1, p2 = self.glevel_set_map[core_set][index][1].split("_")
                         timetable[str(k)][day][p1] = rooms[course]
                         timetable[str(k)][day][p2] = rooms[course]
                 # handle the extra english and PE class to spare slots
-                if course.split("_")[0] == 'Eng' and int(course.split("_")[-1]) <= 9:
-                    timetable[str(k)]['4']['1'] = rooms[course]
-                    timetable[str(k)]['4']['2'] = rooms[course]
-                    timetable[str(k)]['3']['7'] = 'G'
-                    timetable[str(k)]['3']['8'] = 'G'
+                if course.split("_")[0] == "Eng" and int(course.split("_")[-1]) <= 9:
+                    timetable[str(k)]["4"]["1"] = rooms[course]
+                    timetable[str(k)]["4"]["2"] = rooms[course]
+                    timetable[str(k)]["3"]["7"] = "G"
+                    timetable[str(k)]["3"]["8"] = "G"
                     filled_rooms[-1][5].add(rooms[course])
-                elif course.split("_")[0] == 'Eng' and int(course.split("_")[-1]) > 9:
-                    timetable[str(k)]['4']['1'] = 'G'
-                    timetable[str(k)]['4']['2'] = 'G'
-                    timetable[str(k)]['3']['7'] = rooms[course]
+                elif course.split("_")[0] == "Eng" and int(course.split("_")[-1]) > 9:
+                    timetable[str(k)]["4"]["1"] = "G"
+                    timetable[str(k)]["4"]["2"] = "G"
+                    timetable[str(k)]["3"]["7"] = rooms[course]
                     # TODO: place G1 and G2 with un-collided English rooms
-                    timetable[str(k)]['3']['8'] = rooms[course]
+                    timetable[str(k)]["3"]["8"] = rooms[course]
                     # add g2 extra classes
                     filled_rooms[-1][5].add(rooms[course])
             for course in student[4:]:  # for the elective classes
                 for index, slot in enumerate(elect_slots):
                     if course in slot:
                         day, p1, p2 = self.glevel_set_map[elect_set][index][0].split(
-                            "_")
+                            "_"
+                        )
                         timetable[str(k)][day][p1] = rooms[course]
                         timetable[str(k)][day][p2] = rooms[course]
                         day, p1, p2 = self.glevel_set_map[elect_set][index][1].split(
-                            "_")
+                            "_"
+                        )
                         timetable[str(k)][day][p1] = rooms[course]
                         timetable[str(k)][day][p2] = rooms[course]
 
@@ -284,7 +319,7 @@ class TimetableGenerator:
 
         return timetable
 
-    def generate_as_al_level(self):
+    def generate_as_al_level(self) -> Dict[str, Dict[str, Dict[str, str]]]:
         """
         Generate AS-Level Classes
         1: Find the total number of classes for each of the categories: Extra(1F), Bus(2F), Hum(3F), Enr(4F), Lan(5F), Sci(6F)
@@ -320,14 +355,7 @@ class TimetableGenerator:
         :return: timetable as a JSON
         """
         # dictionary for as course frequencies
-        as_freq = {
-            "Extra": 4,
-            "Bus": 10,
-            "Hum": 10,
-            "Enr": 23,
-            "Eng": 23,
-            "Sci": 30
-        }
+        as_freq = {"Extra": 4, "Bus": 10, "Hum": 10, "Enr": 23, "Eng": 23, "Sci": 30}
         # dictionary for as course scheduling sets
         as_set_map = {
             0: ["1_1_2", "2_7_8", "4_3_4"],
@@ -335,7 +363,7 @@ class TimetableGenerator:
             2: ["1_7_8", "3_1_2", "4_9_10"],
             3: ["1_9_10", "3_3_4", "5_1_2"],
             4: ["2_1_2", "3_7_8", "5_3_4"],
-            5: ["2_3_4", "4_1_2", "5_5_6"]
+            5: ["2_3_4", "4_1_2", "5_5_6"],
         }
         # Procedures #
         # 3 distribute timeslots for each course, each slot only needs 20 courses
@@ -350,10 +378,12 @@ class TimetableGenerator:
 
         # 4 distribute the rooms for each course
         # transform the g_level filled_rooms into a timetable format
-        filled_timetable = {str(j): {str(k): set()
-                                     for k in range(1, 11)} for j in range(1, 6)}
-        glevel_set_map = list(self.glevel_set_map[0].values(
-        )) + list(self.glevel_set_map[1].values())
+        filled_timetable = {
+            str(j): {str(k): set() for k in range(1, 11)} for j in range(1, 6)
+        }
+        glevel_set_map = list(self.glevel_set_map[0].values()) + list(
+            self.glevel_set_map[1].values()
+        )
         # don't include the extra two slots at last
         for index, slot in enumerate(self.filled_rooms[:8]):
             for v in slot.values():
@@ -368,10 +398,10 @@ class TimetableGenerator:
         for index, slot in enumerate(self.filled_rooms[8:]):
             for v in slot.values():
                 for room in v:
-                    filled_timetable['3']['7'].add(int(room[1:]))
-                    filled_timetable['3']['8'].add(int(room[1:]))
-                    filled_timetable['4']['1'].add(int(room[1:]))
-                    filled_timetable['4']['2'].add(int(room[1:]))
+                    filled_timetable["3"]["7"].add(int(room[1:]))
+                    filled_timetable["3"]["8"].add(int(room[1:]))
+                    filled_timetable["4"]["1"].add(int(room[1:]))
+                    filled_timetable["4"]["2"].add(int(room[1:]))
 
         # 4 distribute the rooms for each course
         rooms = {}
@@ -392,16 +422,22 @@ class TimetableGenerator:
                         continue
                 # divide by the current filled rooms, use mod because the core slots for g1 are elective slots for g2
                 room = random.choice(
-                    list(self.avail_rooms[floor] - filled_timetable[day1][p11] - filled_timetable[day2][p21] - filled_timetable[day3][p31]))
+                    list(
+                        self.avail_rooms[floor]
+                        - filled_timetable[day1][p11]
+                        - filled_timetable[day2][p21]
+                        - filled_timetable[day3][p31]
+                    )
+                )
                 rooms[course] = self.map_building(room) + str(room)
                 filled_room[floor].add(room)
             filled_rooms.append(filled_room)
 
         # 5 distribute each student's list of courses taken
         # generate the students' slots
-        slots_count = [[i, len(slot)*25] for i, slot in enumerate(slots)]
+        slots_count = [[i, len(slot) * 25] for i, slot in enumerate(slots)]
         offset = 21000
-        students_slots = {i: [] for i in range(offset+1, offset+501)}
+        students_slots = {i: [] for i in range(offset + 1, offset + 501)}
         for student in students_slots:
             slots_count = sorted(slots_count, reverse=True, key=lambda x: x[1])
             slots_indices = [item[0] for item in slots_count[:5]]
@@ -413,11 +449,12 @@ class TimetableGenerator:
         # print(students_slots)
 
         # generate the students
-        students = {i: [] for i in range(offset+1, offset+501)}
+        students = {i: [] for i in range(offset + 1, offset + 501)}
         slots_copy = copy.deepcopy(slots)
         # track the filled courses for each slot
         filled_courses = {
-            i: dict(zip(slots_copy[i], [0] * len(slots_copy[i]))) for i in range(6)}
+            i: dict(zip(slots_copy[i], [0] * len(slots_copy[i]))) for i in range(6)
+        }
         for student in students:
             # print(student)
             for i in students_slots[student]:
@@ -429,21 +466,24 @@ class TimetableGenerator:
                     slots_copy[i].remove(course)
 
         # 5 generate the timetable
-        timetable = {str(i): {str(j): {str(k): "G" for k in range(1, 11)}
-                              for j in range(1, 6)} for i in range(offset+1, offset+501)}
+        timetable: Dict[str, Dict[str, Dict[str, str]]] = {
+            str(i): {str(j): {str(k): "G" for k in range(1, 11)} for j in range(1, 6)}
+            for i in range(offset + 1, offset + 501)
+        }
         for k, student in students.items():
             for course in student:
                 for index, slot in enumerate(slots):
-                    if course in slot:
-                        day, p1, p2 = as_set_map[index][0].split("_")
-                        timetable[str(k)][day][p1] = rooms[course]
-                        timetable[str(k)][day][p2] = rooms[course]
-                        day, p1, p2 = as_set_map[index][1].split("_")
-                        timetable[str(k)][day][p1] = rooms[course]
-                        timetable[str(k)][day][p2] = rooms[course]
-                        day, p1, p2 = as_set_map[index][2].split("_")
-                        timetable[str(k)][day][p1] = rooms[course]
-                        timetable[str(k)][day][p2] = rooms[course]
+                    if course not in slot:
+                        continue
+                    day, p1, p2 = as_set_map[index][0].split("_")
+                    timetable[str(k)][day][p1] = rooms[course]
+                    timetable[str(k)][day][p2] = rooms[course]
+                    day, p1, p2 = as_set_map[index][1].split("_")
+                    timetable[str(k)][day][p1] = rooms[course]
+                    timetable[str(k)][day][p2] = rooms[course]
+                    day, p1, p2 = as_set_map[index][2].split("_")
+                    timetable[str(k)][day][p1] = rooms[course]
+                    timetable[str(k)][day][p2] = rooms[course]
 
         """Generate AL Level, written in the same function to avoid passing filled_rooms which is hard for different set maps"""
         """
@@ -480,14 +520,7 @@ class TimetableGenerator:
 
         :return: timetable as a JSON
         """
-        al_freq = {
-            "Extra": 4,
-            "Bus": 12,
-            "Hum": 10,
-            "Enr": 15,
-            "Eng": 23,
-            "Sci": 20
-        }
+        al_freq = {"Extra": 4, "Bus": 12, "Hum": 10, "Enr": 15, "Eng": 23, "Sci": 20}
 
         # PROCEDURES #
         # 3 distribute timeslots for each course, each slot only needs 20 courses
@@ -518,16 +551,22 @@ class TimetableGenerator:
                         continue
                 # divide by the current filled rooms, use mod because the core slots for g1 are elective slots for g2
                 room = random.choice(
-                    list(self.avail_rooms[floor] - filled_timetable[day1][p11] - filled_timetable[day2][p21]
-                         - filled_timetable[day3][p31] - filled_rooms[index][floor]))  # minus the as time slots as well
+                    list(
+                        self.avail_rooms[floor]
+                        - filled_timetable[day1][p11]
+                        - filled_timetable[day2][p21]
+                        - filled_timetable[day3][p31]
+                        - filled_rooms[index][floor]
+                    )
+                )  # minus the as time slots as well
                 rooms[course] = self.map_building(room) + str(room)
                 filled_room[floor].add(room)
 
         # 5 distribute each student's list of courses taken
         # generate the students' slots
-        slots_count = [[i, len(slot)*25] for i, slot in enumerate(slots)]
+        slots_count = [[i, len(slot) * 25] for i, slot in enumerate(slots)]
         offset = 20000
-        students_slots = {i: [] for i in range(offset+1, offset+501)}
+        students_slots = {i: [] for i in range(offset + 1, offset + 501)}
         for student in students_slots:
             slots_count = sorted(slots_count, reverse=True, key=lambda x: x[1])
             slots_indices = [item[0] for item in slots_count[:4]]
@@ -539,11 +578,12 @@ class TimetableGenerator:
         # print(students_slots)
 
         # generate the students
-        students = {i: [] for i in range(offset+1, offset+501)}
+        students = {i: [] for i in range(offset + 1, offset + 501)}
         slots_copy = copy.deepcopy(slots)
         # track the filled courses for each slot
         filled_courses = {
-            i: dict(zip(slots_copy[i], [0] * len(slots_copy[i]))) for i in range(6)}
+            i: dict(zip(slots_copy[i], [0] * len(slots_copy[i]))) for i in range(6)
+        }
         for student in students:
             # print(student)
             for i in students_slots[student]:
@@ -555,8 +595,10 @@ class TimetableGenerator:
                     slots_copy[i].remove(course)
 
         # 5 generate the timetable
-        al_timetable = {str(i): {str(j): {str(k): "G" for k in range(1, 11)}
-                                 for j in range(1, 6)} for i in range(offset+1, offset+501)}
+        al_timetable = {
+            str(i): {str(j): {str(k): "G" for k in range(1, 11)} for j in range(1, 6)}
+            for i in range(offset + 1, offset + 501)
+        }
         for k, student in students.items():
             for course in student:
                 for index, slot in enumerate(slots):
@@ -588,31 +630,39 @@ class TimetableGenerator:
         flag = True
         for floor in self.avail_rooms.values():
             for room in floor:
-                for i in range(offset, offset+25):
+                for i in range(offset, offset + 25):
                     if i >= len(student_list):
                         flag = False
                         break
-                    if int(student_list[i]) // 1000 == g1_offset // 1000 or int(student_list[i]) // 1000 == g2_offset // 1000:
+                    if (
+                        int(student_list[i]) // 1000 == g1_offset // 1000
+                        or int(student_list[i]) // 1000 == g2_offset // 1000
+                    ):
                         for day in range(1, 6):
-                            self.time_table[student_list[i]][str(
-                                day)]['5'] = self.map_building(room) + str(room)
+                            self.time_table[student_list[i]][str(day)]["5"] = (
+                                self.map_building(room) + str(room)
+                            )
                     else:
                         gt_day = random.choice(["1", "2", "4", "5"])
                         gt_floor = random.choice([6, 7, 8])
-                        gt_room = random.choice(
-                            list(self.avail_rooms[gt_floor]))
+                        gt_room = random.choice(list(self.avail_rooms[gt_floor]))
                         if gt_day != "5":
-                            self.time_table[student_list[i]][gt_day]['5'] = self.map_building(
-                                gt_room) + str(gt_room)
-                            self.time_table[student_list[i]][gt_day]['6'] = self.map_building(
-                                gt_room) + str(gt_room)
+                            self.time_table[student_list[i]][gt_day]["5"] = (
+                                self.map_building(gt_room) + str(gt_room)
+                            )
+                            self.time_table[student_list[i]][gt_day]["6"] = (
+                                self.map_building(gt_room) + str(gt_room)
+                            )
                         else:
-                            self.time_table[student_list[i]][gt_day]['7'] = self.map_building(
-                                gt_room) + str(gt_room)
-                            self.time_table[student_list[i]][gt_day]['8'] = self.map_building(
-                                gt_room) + str(gt_room)
-                        self.time_table[student_list[i]]['3']['5'] = self.map_building(
-                            room) + str(room)
+                            self.time_table[student_list[i]][gt_day]["7"] = (
+                                self.map_building(gt_room) + str(gt_room)
+                            )
+                            self.time_table[student_list[i]][gt_day]["8"] = (
+                                self.map_building(gt_room) + str(gt_room)
+                            )
+                        self.time_table[student_list[i]]["3"]["5"] = self.map_building(
+                            room
+                        ) + str(room)
                 if not flag:
                     break
                 offset += 25
@@ -625,8 +675,8 @@ class TimetableGenerator:
 if __name__ == "__main__":
     # Need to generate multiple times so that the rooms not crash, therefore creating no errors
     generator = TimetableGenerator()
-    time_table1 = generator.generate_g_level("G1")
-    time_table2 = generator.generate_g_level("G2")
+    time_table1 = generator.generate_g_level(Grade.G1)
+    time_table2 = generator.generate_g_level(Grade.G2)
     time_table3 = generator.generate_as_al_level()
     generator.add_pshe_gt()
 

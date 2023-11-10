@@ -31,7 +31,12 @@ for floor_key in source:
             x2 = source[floor_key][block][room_keys[room_idx + 1]][0]
             dist = abs(x2 - x1)
             result[floor_key][block].append(
-                {"nodes": (room_keys[room_idx], room_keys[room_idx+1]), "dist": dist, "type": 0})
+                {
+                    "nodes": (room_keys[room_idx], room_keys[room_idx + 1]),
+                    "dist": dist,
+                    "type": 0,
+                }
+            )
 
 try:
     with open("assets/paths.yaml", "r") as f:
@@ -40,7 +45,7 @@ try:
             print("Overwriting assets/paths.yaml...")
         else:
             print("Aborted.")
-            exit()
+            exit(1)
 except FileNotFoundError:
     pass
 
