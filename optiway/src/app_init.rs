@@ -3,42 +3,51 @@ pub fn setup_custom_fonts(ctx: &egui::Context) {
 
     fonts.font_data.insert(
         "inter_font".to_owned(),
-        egui::FontData::from_static(include_bytes!("../assets/fonts/Inter-micfong.ttf"))
+        egui::FontData::from_static(include_bytes!("../assets/fonts/Inter-micfong.ttf")),
     );
     fonts.font_data.insert(
         "jetbrains_mono_font".to_owned(),
-        egui::FontData::from_static(include_bytes!("../assets/fonts/JetBrainsMono-Regular.ttf"))
+        egui::FontData::from_static(include_bytes!("../assets/fonts/JetBrainsMono-Regular.ttf")),
     );
     fonts.font_data.insert(
         "source_han_sans_font".to_owned(),
-        egui::FontData::from_static(include_bytes!("../assets/fonts/SourceHanSansSC-Regular.otf"))
+        egui::FontData::from_static(include_bytes!(
+            "../assets/fonts/SourceHanSansSC-Regular.otf"
+        )),
     );
     fonts.font_data.insert(
         "material_design_icons_font".to_owned(),
-        egui::FontData::from_static(include_bytes!("../assets/fonts/MaterialDesignIcons.ttf"))
+        egui::FontData::from_static(include_bytes!("../assets/fonts/MaterialDesignIcons.ttf")),
     );
     fonts.font_data.insert(
         "material_symbols_font".to_owned(),
-        egui::FontData::from_static(include_bytes!("../assets/fonts/MaterialSymbolsOutlined.ttf"))
+        egui::FontData::from_static(include_bytes!(
+            "../assets/fonts/MaterialSymbolsOutlined.ttf"
+        )),
     );
-    fonts.families
+    fonts
+        .families
         .entry(egui::FontFamily::Proportional)
         .or_default()
         .insert(0, "inter_font".to_owned());
-    fonts.families
+    fonts
+        .families
         .entry(egui::FontFamily::Proportional)
         .or_default()
         .insert(1, "source_han_sans_font".to_owned());
-    fonts.families
+    fonts
+        .families
         .entry(egui::FontFamily::Proportional)
         .or_default()
         .insert(2, "material_design_icons_font".to_owned());
-    fonts.families
+    fonts
+        .families
         .entry(egui::FontFamily::Proportional)
         .or_default()
         .insert(3, "material_symbols_font".to_owned());
 
-    fonts.families
+    fonts
+        .families
         .entry(egui::FontFamily::Monospace)
         .or_default()
         .insert(0, "jetbrains_mono_font".to_owned());
