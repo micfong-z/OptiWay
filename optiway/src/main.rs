@@ -19,7 +19,7 @@ fn main() -> eframe::Result<()> {
         Box::new(|cc| {
             // egui_extras::install_image_loaders(&cc.egui_ctx);
             Box::new(optiway::OptiWayApp::new(cc))
-        })
+        }),
     )
 }
 
@@ -30,13 +30,13 @@ fn main() {
     let web_options = eframe::WebOptions::default();
 
     wasm_bindgen_futures::spawn_local(async {
-        eframe::WebRunner
-            ::new()
+        eframe::WebRunner::new()
             .start(
                 "the_canvas_id",
                 web_options,
-                Box::new(|cc| Box::new(optiway::OptiWayApp::new(cc)))
-            ).await
+                Box::new(|cc| Box::new(optiway::OptiWayApp::new(cc))),
+            )
+            .await
             .expect("failed to start eframe");
     });
 }
