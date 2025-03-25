@@ -7,4 +7,5 @@ _Refer to the [Project Report](https://github.com/micfong-z/OptiWay/blob/main/Op
 - Beeno Huang
 
 **Project Report**: see [Project Report](https://github.com/micfong-z/OptiWay/blob/main/OptiWay%20Project%20Report.pdf)
+
 **Code Archive PDF**: see [Code Archive](https://github.com/micfong-z/OptiWay/blob/main/OptiWay%20Code%20Archive.pdf)
