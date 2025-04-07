@@ -16,9 +16,10 @@ result = {}
 
 for floor_key in source:
     for side_key in source[floor_key]:
-        if source[floor_key][side_key] != None:
-            for i in source[floor_key][side_key]:
-                result[i] = source[floor_key][side_key][i]
+        if source[floor_key][side_key] is None:
+            continue
+        for i in source[floor_key][side_key]:
+            result[i] = source[floor_key][side_key][i]
 
 with open("assets/projection-coords-flatten.yaml", "w") as f:
     yaml.safe_dump(result, f)
