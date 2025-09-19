@@ -2,7 +2,7 @@ _Refer to the [Project Report](https://github.com/micfong-z/OptiWay/blob/main/Op
 
 **Group Members**
 - Michael Zhang ([website](https://micfong.space))
-- Hardy Wen ([website](https://zehao.tech))
+- Hardy Wen ([website](https://zehaowen.com))
 - David Liu
 - Beeno Huang
 
